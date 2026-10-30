@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="f" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#22186b"/><stop offset="1" stop-color="#0b1026"/></linearGradient>
+    <linearGradient id="r" x1="0" y1="1" x2="1" y2="0"><stop offset="0" stop-color="#3cff9b"/><stop offset=".5" stop-color="#4dd7ff"/><stop offset="1" stop-color="#ffcc33"/></linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="112" fill="url(#f)"/>
+  <g fill="#ffffff14" stroke="#8ca0ff40" stroke-width="4">
+    <rect x="76" y="76" width="96" height="96" rx="22"/><rect x="208" y="76" width="96" height="96" rx="22"/><rect x="340" y="76" width="96" height="96" rx="22"/>
+    <rect x="76" y="208" width="96" height="96" rx="22"/><rect x="208" y="208" width="96" height="96" rx="22"/><rect x="340" y="208" width="96" height="96" rx="22"/>
+    <rect x="76" y="340" width="96" height="96" rx="22"/><rect x="208" y="340" width="96" height="96" rx="22"/><rect x="340" y="340" width="96" height="96" rx="22"/>
+  </g>
+  <polyline points="124,388 256,256 256,124 388,124" fill="none" stroke="url(#r)" stroke-width="34" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="124" cy="388" r="34" fill="#3cff9b"/>
+  <circle cx="388" cy="124" r="34" fill="#ffcc33"/>
+</svg>

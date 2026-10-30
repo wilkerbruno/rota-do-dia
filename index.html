@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Rota do Dia — o desafio de palavras de hoje</title>
+  <meta name="description" content="Um desafio novo por dia: ligue o início à chegada formando palavras com sílabas. Grátis, em português, sem cadastro.">
+  <meta name="theme-color" content="#0b1026">
+  <meta property="og:title" content="Rota do Dia">
+  <meta property="og:description" content="Ligue o início à chegada formando palavras. Um desafio novo todo dia.">
+  <meta property="og:image" content="icones/og.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icones/icone.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icones/icone-192.png">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <div class="aurora" aria-hidden="true"><span></span><span></span><span></span></div>
+
+  <main class="app">
+    <header class="topo">
+      <button class="icone" id="btn-ajuda" aria-label="Como jogar">?</button>
+      <div class="marca">
+        <h1>ROTA <em>do</em> DIA</h1>
+        <p id="subtitulo">Desafio nº 1</p>
+      </div>
+      <div class="acoes-topo">
+        <button class="icone" id="btn-som" aria-label="Som ligado">🔊</button>
+        <button class="icone" id="btn-stats" aria-label="Estatísticas">📊</button>
+      </div>
+    </header>
+
+    <nav class="modos" aria-label="Modo de jogo">
+      <button class="modo ativo" data-modo="diario">Desafio do dia</button>
+      <button class="modo" data-modo="treino">Treino livre</button>
+    </nav>
+
+    <section class="painel">
+      <div class="meta"><span>Meta</span><strong id="meta">4 palavras</strong></div>
+      <div class="meta"><span>Palavras</span><strong id="contagem">0</strong></div>
+      <div class="meta"><span>Estrelas</span><strong id="estrelas-prev">⭐⭐⭐</strong></div>
+    </section>
+
+    <section class="previa" aria-live="polite">
+      <div id="previa-texto" class="previa-texto">Arraste a partir do <b class="tag-inicio">INÍCIO</b></div>
+      <div class="previa-botoes">
+        <button id="btn-limpar" class="mini" aria-label="Limpar traço" hidden>✕</button>
+        <button id="btn-ok" class="mini ok" aria-label="Confirmar palavra" hidden>✓</button>
+      </div>
+    </section>
+
+    <section class="tabuleiro-wrap">
+      <div id="tabuleiro" class="tabuleiro" role="grid" aria-label="Tabuleiro de sílabas"></div>
+      <svg id="linhas" class="linhas" aria-hidden="true"></svg>
+    </section>
+
+    <section id="trilha" class="trilha" aria-label="Palavras da sua rota"></section>
+
+    <section class="controles">
+      <button id="btn-desfazer" class="ctrl">↩ Desfazer</button>
+      <button id="btn-dica" class="ctrl">💡 Dica</button>
+      <button id="btn-recomecar" class="ctrl">⟲ Recomeçar</button>
+    </section>
+
+    <footer class="rodape">
+      <a href="privacidade.html">Privacidade</a> · feito pela Divisions Tech
+    </footer>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <canvas id="confete" class="confete" aria-hidden="true"></canvas>
+
+  <dialog id="dlg-ajuda" class="dlg">
+    <h2>Como jogar</h2>
+    <ol class="passos">
+      <li><span class="ex inicio">CO</span> Comece no <b>INÍCIO</b> e arraste por casas vizinhas (até na diagonal) para formar uma palavra: <b>CO·RU·JA</b>.</li>
+      <li><span class="ex">JA</span> A próxima palavra começa na <b>última sílaba</b> da anterior: <b>JA·CA</b>, depois <b>CA·NE·TA</b>…</li>
+      <li><span class="ex fim">🏁</span> Chegue à <b>CHEGADA</b>. Casa usada não volta. Usou as palavras da meta ou menos? <b>3 estrelas.</b></li>
+    </ol>
+    <p class="nota">No celular dá para tocar casa por casa e confirmar no ✓. Um desafio novo sai todo dia à meia-noite.</p>
+    <button class="grande" data-fechar>Bora jogar</button>
+  </dialog>
+
+  <dialog id="dlg-vitoria" class="dlg vitoria">
+    <p class="selo" id="vit-selo">Rota completa!</p>
+    <div class="estrelas-grandes" id="vit-estrelas"></div>
+    <p class="vit-resumo" id="vit-resumo"></p>
+    <div class="vit-rota" id="vit-rota"></div>
+    <button class="grande" id="btn-compartilhar">Compartilhar resultado</button>
+    <div class="proximo" id="vit-proximo">Próximo desafio em <b id="contador">--:--:--</b></div>
+    <div class="linha-botoes">
+      <button class="secundario" id="btn-treinar">Treinar mais</button>
+      <button class="secundario" data-fechar>Ver tabuleiro</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-stats" class="dlg">
+    <h2>Suas estatísticas</h2>
+    <div class="numeros">
+      <div><strong id="st-jogos">0</strong><span>jogos</span></div>
+      <div><strong id="st-vitorias">0</strong><span>rotas</span></div>
+      <div><strong id="st-seq">0</strong><span>sequência</span></div>
+      <div><strong id="st-melhor">0</strong><span>melhor</span></div>
+    </div>
+    <h3>Estrelas por rota</h3>
+    <div class="barras" id="st-barras"></div>
+    <p class="nota">Ficam só neste aparelho.</p>
+    <button class="grande" data-fechar>Fechar</button>
+  </dialog>
+
+  <script type="module" src="jogo.js"></script>
+</body>
+</html>
