@@ -9,8 +9,8 @@ $jogador = autenticar($in);
 
 if (cfg_ok()) {
     $st = db()->prepare("SELECT mp_id FROM compras WHERE jogador = ? AND mp_id IS NOT NULL
-        AND status IN ('pending', 'in_process', 'authorized') AND conferido < ?");
-    $st->execute([$jogador, time() - 10]);
+        AND status IN ('pending', 'in_process', 'authorized') AND conferido < ? AND criado > ?");
+    $st->execute([$jogador, time() - 10, time() - 86400]);
     foreach ($st->fetchAll(PDO::FETCH_COLUMN) as $mpId) {
         atualizar_pela_api($mpId);
     }

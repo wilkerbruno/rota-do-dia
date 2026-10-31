@@ -862,15 +862,18 @@ async function sincronizarCompras(silencioso = false) {
 
 function pararPix() { clearInterval(pollPix); pollPix = null; }
 
+let pacoteAtual = null;
 async function abrirCompra(pacoteId) {
+  pacoteAtual = pacoteId;
+  pararPix();
   const p = pacotes().find((x) => x.id === pacoteId);
   $("pag-titulo").textContent = p.nome;
   $("pag-preco").textContent = p.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   $("pag-pix").hidden = true;
   $("brick-pagamento").hidden = false;
   $("pag-msg").textContent = ambienteTeste() ? "Modo teste: use os dados de teste do Mercado Pago. Nenhum valor é cobrado." : "";
-  $("dlg-loja").close();
-  $("dlg-pagamento").showModal();
+  if ($("dlg-loja").open) $("dlg-loja").close();
+  if (!$("dlg-pagamento").open) $("dlg-pagamento").showModal();
   try {
     await abrirPagamento($("brick-pagamento"), pacoteId, aoPagar);
   } catch {
@@ -919,6 +922,7 @@ $("pacotes").addEventListener("click", (e) => {
   if (b && !b.disabled) abrirCompra(b.dataset.pacote);
 });
 $("btn-pag-fechar").addEventListener("click", () => $("dlg-pagamento").close());
+$("btn-pix-cartao").addEventListener("click", () => pacoteAtual && abrirCompra(pacoteAtual));
 $("dlg-pagamento").addEventListener("close", () => { pararPix(); fecharPagamento(); });
 $("btn-recuperar").addEventListener("click", async () => {
   const ok = await recuperar($("codigo-recuperar").value);

@@ -33,6 +33,10 @@ $corpo = [
     'statement_descriptor' => 'ROTADODIA',
     'payer' => ['email' => $email],
 ];
+if ($metodo === 'pix') {
+    // Pix vence em 30 min: não deixa compra pendente para sempre
+    $corpo['date_of_expiration'] = (new DateTime('+30 minutes'))->format('Y-m-d\TH:i:s.vP');
+}
 if (!empty($f['token'])) { // cartão
     $corpo['token'] = (string)$f['token'];
     $corpo['installments'] = 1;
