@@ -1,5 +1,5 @@
 // Cache para abrir rápido e funcionar offline. Troque VERSAO a cada publicação.
-const VERSAO = "rota-v5";
+const VERSAO = "rota-v6";
 const ARQUIVOS = [
   "./", "index.html", "estilo.css", "jogo.js", "puzzle.js", "palavras.js", "palavras-validas.txt", "privacidade.html",
   "carteira.js", "anuncios.js", "config.js",
@@ -22,7 +22,7 @@ self.addEventListener("activate", (e) => {
 self.addEventListener("fetch", (e) => {
   if (e.request.method !== "GET" || new URL(e.request.url).pathname.includes("/api/")) return;
   e.respondWith(
-    fetch(e.request)
+    fetch(e.request, { cache: "no-cache" }) // sempre confere com o servidor (ETag) antes de usar
       .then((r) => {
         const copia = r.clone();
         caches.open(VERSAO).then((c) => c.put(e.request, copia));
