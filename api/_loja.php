@@ -54,9 +54,27 @@ function pode_vender(): bool
     }
     if (($c['MP_AMBIENTE'] ?? '') === 'teste') {
         // trava: em modo teste só vale credencial de teste, para nunca cobrar de verdade por engano
-        return strpos($c['MP_ACCESS_TOKEN'], 'TEST-') === 0;
+        return credencial_de_teste();
     }
     return ($c['LOJA_PUBLICA'] ?? '0') === '1';
+}
+
+/**
+ * Credencial antiga (TEST-) ou a atual do ambiente de teste (APP_USR- de uma conta de teste).
+ * Na atual o prefixo é igual ao de produção, então pergunta ao Mercado Pago se a conta é de teste.
+ */
+function credencial_de_teste(): bool
+{
+    static $ok = null;
+    if ($ok === null) {
+        if (strpos(cfg()['MP_ACCESS_TOKEN'], 'TEST-') === 0) {
+            $ok = true;
+        } else {
+            [$codigo, $me] = mp('GET', '/users/me');
+            $ok = $codigo === 200 && in_array('test_user', $me['tags'] ?? [], true);
+        }
+    }
+    return $ok;
 }
 
 function responder(int $codigo, array $dados): void
