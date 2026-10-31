@@ -54,7 +54,7 @@ if ($codigo < 200 || $codigo >= 300 || empty($p['id'])) {
         ->execute(['erro', substr((string)($p['message'] ?? $codigo), 0, 200), $compra]);
     $resp = ['ok' => false, 'erro' => 'pagamento recusado'];
     if ((cfg()['MP_AMBIENTE'] ?? '') === 'teste') { // só em teste: mostra o motivo do Mercado Pago na tela
-        $resp['motivo'] = substr($codigo . ' ' . ($p['message'] ?? '') . ' ' . json_encode($p['cause'] ?? ''), 0, 300);
+        $resp['motivo'] = substr('[' . $metodo . '] ' . $codigo . ' ' . ($p['message'] ?? '') . ' ' . json_encode($p['cause'] ?? ''), 0, 300);
     }
     responder(502, $resp);
 }
