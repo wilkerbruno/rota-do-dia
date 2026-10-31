@@ -1,11 +1,21 @@
 // node --test jogos/rota-do-dia/tests
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
-  DICT, WORDS, dailyPuzzle, dayNumber, isAdjacent, isStuck, isWon, makePuzzle, newGame, stars,
-  submit, undo,
+  DICT, WORDS, dailyPuzzle, dayNumber, isAdjacent, isStuck, isWon, isWord, loadExtra, makePuzzle,
+  newGame, stars, submit, undo,
 } from "../puzzle.js";
+
+test("dicionário completo aceita palavras fora da lista básica", () => {
+  assert.equal(isWord("CO-ME-MO-RA-ÇÃO"), false);
+  const n = loadExtra(readFileSync(new URL("../palavras-validas.txt", import.meta.url), "utf-8"));
+  assert.ok(n > 100000, `só ${n} palavras`);
+  for (const w of ["CO-ME-MO-RA-ÇÃO", "PI-PO-CAS", "CA-NE-TA", "TO-MA-TE"]) assert.ok(isWord(w), w);
+  for (const w of ["CA-TO-PI", "ZE-ZE-ZE"]) assert.equal(isWord(w), false, w);
+  for (const w of WORDS) assert.ok(isWord(w.join("-")));
+});
 
 function play(puzzle) {
   let game = newGame(puzzle);

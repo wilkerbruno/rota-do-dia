@@ -12,6 +12,14 @@ export const LAUNCH = "2026-11-01"; // desafio nº 1
 export const WORDS = PALAVRAS.split(/\s+/).filter(Boolean).map((w) => w.toUpperCase().split("-"));
 export const DICT = new Set(WORDS.map((s) => s.join("-")));
 
+// Dicionário completo (palavras-validas.txt), carregado depois da abertura. Até chegar, vale a lista básica.
+const EXTRA = new Set();
+export function loadExtra(text) {
+  for (const line of text.split("\n")) if (line && line[0] !== "#") EXTRA.add(line.trim());
+  return EXTRA.size;
+}
+export const isWord = (word) => DICT.has(word) || EXTRA.has(word);
+
 const BY_FIRST = new Map();
 for (const w of WORDS) {
   if (!BY_FIRST.has(w[0])) BY_FIRST.set(w[0], []);
@@ -168,7 +176,7 @@ export function traceWord(puzzle, trace) {
 export function submit(puzzle, game, trace) {
   if (trace.length < 2 || trace[0] !== game.head) return { ok: false, reason: "curta" };
   const word = traceWord(puzzle, trace);
-  if (!DICT.has(word)) return { ok: false, reason: "desconhecida", word };
+  if (!isWord(word)) return { ok: false, reason: "desconhecida", word };
   return {
     ok: true,
     word,

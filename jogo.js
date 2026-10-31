@@ -1,7 +1,7 @@
 // Interface do Rota do Dia: tabuleiro, traço por arrasto ou toque, som, confete, estatísticas.
 import {
-  DICT, canExtend, dailyPuzzle, dateKey, dayNumber, isStuck, isWon, makePuzzle, newGame, stars,
-  submit, traceWord, undo,
+  canExtend, dailyPuzzle, dateKey, dayNumber, isStuck, isWon, isWord, loadExtra, makePuzzle, newGame,
+  stars, submit, traceWord, undo,
 } from "./puzzle.js";
 
 const CORES = ["#3cff9b", "#4dd7ff", "#ff6ad5", "#ffb547", "#a78bfa", "#ff5c7a"];
@@ -44,7 +44,8 @@ function tom(freq, dur = 0.12, tipo = "triangle", vol = 0.12, quando = 0) {
     osc.stop(t + dur + 0.02);
   } catch {}
 }
-const vibrar = (ms) => { try { navigator.vibrate?.(ms); } catch {} };
+// o navegador só deixa vibrar depois de um toque de verdade na página
+const vibrar = (ms) => { try { if (navigator.userActivation?.hasBeenActive !== false) navigator.vibrate?.(ms); } catch {} };
 const somPasso = (i) => tom(NOTAS[Math.min(i, NOTAS.length - 1)], 0.09, "sine", 0.1);
 const somAcerto = () => [0, 2, 4, 7].forEach((n, i) => tom(NOTAS[n], 0.18, "triangle", 0.12, i * 0.06));
 const somErro = () => { tom(160, 0.18, "sawtooth", 0.06); tom(120, 0.22, "sawtooth", 0.05, 0.08); };
@@ -220,7 +221,7 @@ function desenhar() {
   if (trace.length) {
     const palavra = traceWord(puzzle, trace);
     pv.textContent = palavra.replaceAll("-", "·");
-    pv.classList.add(DICT.has(palavra) && trace.length > 1 ? "certo" : "ativo");
+    pv.classList.add(isWord(palavra) && trace.length > 1 ? "certo" : "ativo");
   } else if (travado) {
     pv.textContent = "Rota completa! 🏁";
     pv.classList.add("certo");
@@ -466,5 +467,9 @@ document.addEventListener("visibilitychange", () => {
 // ---------- início ----------
 atualizarSom();
 carregar();
+fetch("palavras-validas.txt")
+  .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
+  .then((t) => { loadExtra(t); if (trace.length) desenhar(); })
+  .catch(() => aviso("Dicionário completo não carregou; valendo a lista básica", 3500));
 if (!ler("visto", false)) { guardar("visto", true); setTimeout(() => $("dlg-ajuda").showModal(), 600); }
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
