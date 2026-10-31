@@ -123,10 +123,13 @@ export async function abrirPagamento(container, pacoteId, aoResultado) {
       onError: (e) => {
         console.warn("brick", e);
         if (e?.type === "critical") aoResultado({ erro: "Não foi possível abrir o pagamento agora. Tente de novo em instantes." });
+        else if (ambienteTeste()) aoResultado({ erro: `Teste: ${e?.cause || ""} ${e?.message || ""}`.trim() });
       },
       onSubmit: ({ formData }) =>
         api("pagar.php", { jogador: j.jogador, segredo: j.segredo, pacote: pacoteId, formData })
-          .then((r) => aoResultado(r.ok ? { status: r.status, pix: r.pix } : { erro: "Pagamento não foi aceito. Confira os dados." }))
+          .then((r) => aoResultado(r.ok ? { status: r.status, detalhe: r.detalhe, pix: r.pix } : {
+            erro: "Pagamento não foi aceito. Confira os dados." + (ambienteTeste() ? ` (teste: ${r.erro || r.status} ${r.motivo || ""})` : ""),
+          }))
           .catch(() => aoResultado({ erro: "Sem conexão com o servidor" })),
     },
   });

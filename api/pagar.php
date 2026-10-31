@@ -53,7 +53,11 @@ if (!empty($f['token'])) { // cartão
 if ($codigo < 200 || $codigo >= 300 || empty($p['id'])) {
     db()->prepare('UPDATE compras SET status = ?, detalhe = ? WHERE id = ?')
         ->execute(['erro', substr((string)($p['message'] ?? $codigo), 0, 200), $compra]);
-    responder(502, ['ok' => false, 'erro' => 'pagamento recusado']);
+    $resp = ['ok' => false, 'erro' => 'pagamento recusado'];
+    if ((cfg()['MP_AMBIENTE'] ?? '') === 'teste') { // só em teste: mostra o motivo do Mercado Pago na tela
+        $resp['motivo'] = substr($codigo . ' ' . ($p['message'] ?? '') . ' ' . json_encode($p['cause'] ?? ''), 0, 300);
+    }
+    responder(502, $resp);
 }
 
 db()->prepare('UPDATE compras SET mp_id = ?, status = ?, detalhe = ?, conferido = ? WHERE id = ?')

@@ -890,7 +890,10 @@ async function aoPagar(r) {
     confete();
     return;
   }
-  if (r.status === "rejected") { $("pag-msg").textContent = "Pagamento recusado. Tente outro cartão ou o Pix."; return; }
+  if (r.status === "rejected") {
+    $("pag-msg").textContent = "Pagamento recusado. Tente outro cartão ou o Pix." + (ambienteTeste() ? ` (teste: ${r.detalhe || ""})` : "");
+    return;
+  }
   // Pix (pending) ou cartão em análise: espera a confirmação
   await fecharPagamento();
   $("brick-pagamento").hidden = true;
