@@ -33,13 +33,20 @@
 
     <div class="barra-topo">
       <button class="moedas" id="btn-moedas" aria-label="Moedas e loja"><span class="moeda">🪙</span> <b id="saldo">0</b> <span class="mais">+</span></button>
+      <button class="vidas" id="btn-vidas" aria-label="Vidas">❤️ <b id="vidas-n">5</b> <small id="vidas-tempo"></small></button>
       <span class="seq" id="seq-topo" title="Dias seguidos">🔥 0</span>
     </div>
 
-    <nav class="modos" aria-label="Modo de jogo">
+    <nav class="modos tres" aria-label="Modo de jogo">
+      <button class="modo" data-modo="jornada">🗺️ Jornada</button>
       <button class="modo ativo" data-modo="diario">Desafio do dia</button>
-      <button class="modo" data-modo="treino">Treino livre</button>
+      <button class="modo" data-modo="treino">Treino</button>
     </nav>
+
+    <div class="faixa-fase" id="faixa-fase" hidden>
+      <button class="mapa-btn" id="btn-mapa">🗺️ Mapa</button>
+      <span id="fase-regras"></span>
+    </div>
 
     <nav class="niveis" aria-label="Dificuldade">
       <button class="nivel" data-nivel="facil">Fácil <i></i></button>
@@ -166,6 +173,18 @@
       </div>
     </div>
 
+    <h3>Jornada</h3>
+    <div class="itens">
+      <div class="item">
+        <span class="item-icone">❤️</span>
+        <div><b>Encher vidas</b><small>Volta para 5 vidas na hora.</small></div>
+        <div class="item-botoes">
+          <button class="comprar" data-ajuda="vidas">🪙 60</button>
+          <button class="video mini-video" id="btn-loja-vida">▶ +1</button>
+        </div>
+      </div>
+    </div>
+
     <h3>Proteção</h3>
     <div class="itens">
       <div class="item">
@@ -180,6 +199,39 @@
 
     <p class="nota">Moedas valem só dentro do jogo: não se compram nem se trocam por dinheiro.</p>
     <button class="grande" data-fechar>Voltar ao jogo</button>
+  </dialog>
+
+  <dialog id="dlg-mapa" class="dlg mapa">
+    <div class="loja-topo">
+      <h2>Jornada</h2>
+      <span class="estrelas-total" id="mapa-estrelas">⭐ 0</span>
+    </div>
+    <p class="nota">Cada fase fica mais difícil: menos palavras de sobra, pedras no caminho e casas ⭐ obrigatórias. Baú de moedas a cada 10 fases.</p>
+    <div class="trilha-mapa" id="trilha-mapa"></div>
+    <button class="grande" data-fechar>Fechar</button>
+  </dialog>
+
+  <dialog id="dlg-derrota" class="dlg vitoria">
+    <p class="selo derrota-selo">Acabaram as palavras!</p>
+    <p class="vit-resumo" id="derrota-resumo">Faltou pouco.</p>
+    <button class="video grande-video" id="btn-extra-video">▶ +2 palavras com vídeo</button>
+    <button class="grande" id="btn-extra-moedas">🪙 40 · +2 palavras</button>
+    <div class="linha-botoes">
+      <button class="secundario" id="btn-desistir">Tentar de novo (−1 ❤️)</button>
+      <button class="secundario" id="btn-derrota-mapa">Mapa</button>
+    </div>
+  </dialog>
+
+  <dialog id="dlg-vidas" class="dlg vitoria">
+    <p class="selo">Vidas</p>
+    <div class="bonus-valor">❤️ <b id="dlg-vidas-n">0</b>/5</div>
+    <p class="vit-resumo" id="dlg-vidas-tempo">Próxima vida em --:--</p>
+    <button class="video grande-video" id="btn-vida-video">▶ +1 vida com vídeo</button>
+    <button class="grande" id="btn-vida-moedas">🪙 60 · encher vidas</button>
+    <div class="linha-botoes">
+      <button class="secundario" id="btn-vidas-diario">Jogar o desafio do dia</button>
+      <button class="secundario" data-fechar>Fechar</button>
+    </div>
   </dialog>
 
   <dialog id="dlg-bonus" class="dlg vitoria">

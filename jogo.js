@@ -1,12 +1,13 @@
 // Interface do Rota do Dia: tabuleiro, traço por arrasto ou toque, níveis, moedas, ajudas, loja,
 // vídeos premiados, som, confete e estatísticas.
 import {
-  LEVELS, canExtend, dailyPuzzle, dateKey, dayNumber, isStuck, isWon, isWord, loadExtra, makePuzzle,
-  newGame, solve, stars, submit, traceWord, undo, uselessCells, warmUp,
+  LEVELS, canExtend, dailyPuzzle, dateKey, dayNumber, fasePuzzle, isStuck, isWon, isWord, loadExtra,
+  makePuzzle, newGame, solve, stars, submit, traceWord, undo, uselessCells, warmUp,
 } from "./puzzle.js";
 import {
-  BONUS_DIARIO, PRECOS, TEMAS, TREINO_MOEDAS, VIDEO_MOEDAS, bonusDiario, comprarTema, gastar, ganhar,
-  novaCarteira, premioVitoria, registrarDia, restante, usarCota,
+  BAU_A_CADA, BAU_MOEDAS, BONUS_DIARIO, MAX_VIDAS, PRECOS, TEMAS, TREINO_MOEDAS, VIDEO_MOEDAS,
+  bonusDiario, comprarTema, gastar, ganhar, ganharVida, novaCarteira, perderVida, premioFase,
+  premioVitoria, registrarDia, restante, usarCota, vidasAgora,
 } from "./carteira.js";
 import { anunciosAtivos, iniciarAnuncios, intersticial, videoPremiado } from "./anuncios.js";
 
@@ -23,7 +24,14 @@ const ler = (k, padrao) => {
 const STATS_VAZIO = { jogos: 0, vitorias: 0, seq: 0, melhor: 0, estrelas: { 1: 0, 2: 0, 3: 0 } };
 
 // ---------- estado ----------
-let modo = "diario";
+let modo = ["jornada", "diario", "treino"].includes(ler("modo", "diario")) ? ler("modo", "diario") : "diario";
+let jornada = ler("jornada", null) || { atual: 1, estrelas: {} };
+let fase = jornada.atual;
+let jogadas = 0; // palavras aceitas na tentativa (desfazer não devolve)
+let extras = 0; // palavras compradas ou ganhas com vídeo
+let extraVideoUsado = false;
+let moedasPegas = [];
+let fasesSeguidas = 0;
 let nivel = LEVELS[ler("nivel", "medio")] ? ler("nivel", "medio") : "medio";
 let hoje = dateKey();
 let puzzle, game, trace = [], arrastando = false, cresceuNoArrasto = false, travado = false;
@@ -159,17 +167,48 @@ function carregar() {
       premio = salvo.premio || null;
     }
     $("subtitulo").textContent = `${nomeDoDesafio()} · ${LEVELS[nivel].nome}`;
+  } else if (modo === "jornada") {
+    puzzle = fasePuzzle(fase);
+    game = { ...newGame(puzzle), blocked: [...puzzle.pedras] };
+    jogadas = 0;
+    extras = 0;
+    extraVideoUsado = false;
+    moedasPegas = [];
+    const salvo = ler("partida-fase", null);
+    if (salvo?.fase === fase) {
+      for (const cells of salvo.words) {
+        const r = submit(puzzle, game, cells);
+        if (r.ok) game = r.game;
+      }
+      game = { ...game, hints: salvo.hints || 0, blocked: salvo.blocked || game.blocked };
+      ({ jogadas, extras, extraVideoUsado, moedasPegas } = salvo);
+    }
+    $("subtitulo").textContent = `Fase ${fase}`;
+    $("fase-regras").textContent = [
+      `Máx. ${puzzle.maxPalavras} palavras`,
+      puzzle.pedras.length ? "🪨 pedras" : "",
+      puzzle.obrigatoria !== null ? "passe pela ⭐" : "",
+      puzzle.moedas.length ? "pegue as 🪙" : "",
+    ].filter(Boolean).join(" · ");
   } else {
     puzzle = makePuzzle(`treino:${Date.now()}:${Math.random()}`, nivel);
     game = newGame(puzzle);
     $("subtitulo").textContent = `Treino livre · ${LEVELS[nivel].nome}`;
   }
+  $("faixa-fase").hidden = modo !== "jornada";
+  document.querySelector(".niveis").hidden = modo === "jornada";
+  guardar("modo", modo);
   montarTabuleiro();
   desenhar();
   (window.requestIdleCallback || setTimeout)(() => warmUp(puzzle));
   if (isWon(puzzle, game)) {
     travado = true;
     if (modo === "diario") setTimeout(() => mostrarVitoria(false), 500);
+  }
+  if (modo === "jornada" && vidasAgora(carteira).n <= 0) {
+    travado = true;
+    desenhar();
+    setTimeout(abrirVidas, 400);
   }
 }
 
@@ -183,12 +222,22 @@ function montarTabuleiro() {
     b.textContent = silaba;
     if (i === puzzle.start) b.insertAdjacentHTML("beforeend", '<span class="rot">INÍCIO</span>');
     if (i === puzzle.finish) b.insertAdjacentHTML("beforeend", '<span class="rot">CHEGADA</span>');
+    if (puzzle.moedas?.includes(i)) b.insertAdjacentHTML("beforeend", '<span class="selo-moeda">🪙</span>');
+    if (puzzle.obrigatoria === i) b.insertAdjacentHTML("beforeend", '<span class="selo-estrela">⭐</span>');
+    if (puzzle.pedras?.includes(i)) b.textContent = "";
     tabuleiro.appendChild(b);
     return b;
   });
 }
 
 function salvar() {
+  if (modo === "jornada") {
+    if (isWon(puzzle, game)) return guardar("partida-fase", null);
+    return guardar("partida-fase", {
+      fase, words: game.words.map((w) => w.cells), hints: game.hints, blocked: game.blocked || [],
+      jogadas, extras, extraVideoUsado, moedasPegas,
+    });
+  }
   if (modo !== "diario") return;
   guardar(chaveDia(), {
     words: game.words.map((w) => w.cells), hints: game.hints, blocked: game.blocked || [],
@@ -243,7 +292,11 @@ function desenhar() {
     if (i === game.head && !travado) b.classList.add("cabeca");
     if (trace.includes(i)) { b.classList.add("no-traco"); b.style.background = ""; }
     else if (trace.length && canExtend(game, trace, i)) b.classList.add("livre");
-    if (bloqueadas.includes(i)) b.classList.add("limpa");
+    if (puzzle.pedras?.includes(i)) b.classList.add("pedra");
+    else if (bloqueadas.includes(i)) b.classList.add("limpa");
+    if (puzzle.obrigatoria === i && !game.used.includes(i)) b.classList.add("obrigatoria");
+    const selo = b.querySelector(".selo-moeda");
+    if (selo) selo.hidden = moedasPegas.includes(i);
     if (sugestao.includes(i) && !travado) b.classList.add("sugerida");
     if (travado && !cor.has(i)) b.classList.add("apagada");
     b.setAttribute("aria-label", `${puzzle.grid[i]}${i === puzzle.start ? ", início" : ""}${i === puzzle.finish ? ", chegada" : ""}`);
@@ -268,7 +321,7 @@ function desenhar() {
 
   // painel
   $("meta").textContent = `${puzzle.par} palavras`;
-  $("contagem").textContent = game.words.length;
+  $("contagem").textContent = modo === "jornada" ? `${jogadas}/${puzzle.maxPalavras + extras}` : game.words.length;
   $("estrelas-prev").textContent = "⭐".repeat(stars(puzzle, game)) || "—";
   $("btn-desfazer").disabled = travado || !game.words.length;
   $("btn-recomecar").disabled = travado || !game.words.length;
@@ -393,16 +446,168 @@ function confirmar() {
   vibrar(20);
   desenhar();
   feitas.forEach((c, i) => setTimeout(() => casas[c].classList.add("acerto"), i * 50));
+  if (modo === "jornada") {
+    jogadas += 1;
+    const novas = feitas.filter((c) => puzzle.moedas.includes(c) && !moedasPegas.includes(c));
+    if (novas.length) {
+      moedasPegas = [...moedasPegas, ...novas];
+      carteira = ganhar(carteira, 3 * novas.length);
+      guardar("carteira", carteira);
+      moedasVoando(casas[novas[0]], 3 * novas.length);
+    }
+    desenhar();
+  }
   salvar();
   if (primeira && modo === "diario") evento("inicio");
   if (isWon(puzzle, game)) return vencer();
+  if (game.head === puzzle.finish && puzzle.obrigatoria !== null) aviso("Falta passar pela ⭐ antes da chegada!", 3000);
+  if (modo === "jornada" && jogadas >= puzzle.maxPalavras + extras) return setTimeout(derrota, 600);
   if (isStuck(puzzle, game)) aviso("Sem saída! Toque em ↩ Desfazer", 3000);
 }
+
+// ---------- Jornada: derrota, vidas e mapa ----------
+let escolheuNaDerrota = false;
+function derrota() {
+  travado = true;
+  escolheuNaDerrota = false;
+  desenhar();
+  somErro();
+  $("derrota-resumo").textContent = `Você usou ${jogadas} de ${puzzle.maxPalavras + extras} palavras na fase ${fase}.`;
+  $("btn-extra-video").hidden = !anunciosAtivos() || extraVideoUsado;
+  $("btn-extra-moedas").disabled = carteira.moedas < PRECOS.palavrasExtras;
+  $("dlg-derrota").showModal();
+}
+
+function continuarComExtras() {
+  escolheuNaDerrota = true;
+  extras += 2;
+  travado = false;
+  salvar();
+  $("dlg-derrota").close();
+  desenhar();
+  aviso("+2 palavras! Continue a rota");
+}
+
+/** Perde 1 vida e recomeça a fase; sem vidas, abre a janela de vidas. */
+function desistir(depois) {
+  escolheuNaDerrota = true;
+  if ($("dlg-derrota").open) $("dlg-derrota").close();
+  const c = perderVida(carteira);
+  guardar("partida-fase", null);
+  if (!c) { carregar(); return abrirVidas(); }
+  carteira = c;
+  guardar("carteira", carteira);
+  carregar();
+  depois?.();
+}
+
+$("btn-extra-video").addEventListener("click", async () => {
+  const r = await videoPremiado("palavras-extras");
+  if (!r.ok) return aviso(r.motivo === "fechou" ? "Vídeo fechado antes do fim" : "Nenhum vídeo disponível agora");
+  evento("video");
+  extraVideoUsado = true;
+  continuarComExtras();
+});
+$("btn-extra-moedas").addEventListener("click", () => { if (pagar(PRECOS.palavrasExtras)) continuarComExtras(); });
+$("btn-desistir").addEventListener("click", () => desistir());
+$("btn-derrota-mapa").addEventListener("click", () => desistir(abrirMapa));
+$("dlg-derrota").addEventListener("close", () => { if (!escolheuNaDerrota) desistir(); });
+
+function textoTempo(ms) {
+  const s = Math.ceil(ms / 1000);
+  return `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+
+function atualizarVidas() {
+  const v = vidasAgora(carteira);
+  if (v.n !== carteira.vidas?.n || v.carteira.vidas.desde !== carteira.vidas?.desde) {
+    carteira = v.carteira;
+    guardar("carteira", carteira);
+  }
+  $("vidas-n").textContent = v.n;
+  $("vidas-tempo").textContent = v.n < MAX_VIDAS ? textoTempo(v.proxima) : "";
+  if ($("dlg-vidas").open) {
+    $("dlg-vidas-n").textContent = v.n;
+    $("dlg-vidas-tempo").textContent = v.n < MAX_VIDAS ? `Próxima vida em ${textoTempo(v.proxima)}` : "Vidas cheias!";
+  }
+  return v.n;
+}
+setInterval(atualizarVidas, 1000);
+
+function abrirVidas() {
+  const n = atualizarVidas();
+  $("btn-vida-video").hidden = !anunciosAtivos();
+  $("btn-vida-video").disabled = n >= MAX_VIDAS || restante(carteira, dateKey(), "videoVida") <= 0;
+  $("btn-vida-moedas").disabled = n >= MAX_VIDAS || carteira.moedas < PRECOS.vidas;
+  if (!$("dlg-vidas").open) $("dlg-vidas").showModal();
+  atualizarVidas();
+}
+
+function vidasRecebidas() {
+  atualizarVidas();
+  if (modo === "jornada" && travado && !isWon(puzzle, game)) carregar();
+}
+
+async function vidaPorVideo() {
+  const c = usarCota(carteira, dateKey(), "videoVida");
+  if (!c) return aviso("Vídeos de vida de hoje acabaram");
+  const r = await videoPremiado("vida");
+  if (!r.ok) return aviso(r.motivo === "fechou" ? "Vídeo fechado antes do fim" : "Nenhum vídeo disponível agora");
+  evento("video");
+  carteira = ganharVida(c, 1);
+  guardar("carteira", carteira);
+  aviso("+1 ❤️");
+  vidasRecebidas();
+}
+$("btn-vida-video").addEventListener("click", async () => { await vidaPorVideo(); if ($("dlg-vidas").open) abrirVidas(); });
+$("btn-loja-vida").addEventListener("click", async () => { await vidaPorVideo(); if ($("dlg-loja").open) abrirLoja(); });
+$("btn-vida-moedas").addEventListener("click", () => {
+  if (!pagar(PRECOS.vidas)) return;
+  carteira = ganharVida(carteira, MAX_VIDAS);
+  guardar("carteira", carteira);
+  $("dlg-vidas").close();
+  vidasRecebidas();
+});
+$("btn-vidas").addEventListener("click", abrirVidas);
+$("btn-vidas-diario").addEventListener("click", () => { $("dlg-vidas").close(); trocarModo("diario"); });
+
+function abrirMapa() {
+  const total = Object.values(jornada.estrelas).reduce((a, b) => a + b, 0);
+  $("mapa-estrelas").textContent = `⭐ ${total}`;
+  const ultima = Math.max(jornada.atual + 5, 12);
+  let html = "";
+  for (let n = 1; n <= ultima; n++) {
+    const est = jornada.estrelas[n] || 0;
+    const estado = n < jornada.atual || est ? "feita" : n === jornada.atual ? "atual" : "trancada";
+    const bau = n % BAU_A_CADA === 0 ? `<span class="bau">${est ? "🎁✓" : "🎁"}</span>` : "";
+    html += `<div class="linha-fase"><button class="no-fase ${estado}" data-fase="${n}" ${estado === "trancada" ? "disabled" : ""}>${n}<small>${"⭐".repeat(est)}</small></button>${bau}</div>`;
+  }
+  $("trilha-mapa").innerHTML = html;
+  if (!$("dlg-mapa").open) $("dlg-mapa").showModal();
+  $("trilha-mapa").querySelector(".atual")?.scrollIntoView({ block: "center" });
+}
+$("trilha-mapa").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-fase]");
+  if (!b || b.disabled) return;
+  $("dlg-mapa").close();
+  fase = Number(b.dataset.fase);
+  trocarModo("jornada", fase);
+});
+$("btn-mapa").addEventListener("click", abrirMapa);
 
 function vencer() {
   travado = true;
   const n = stars(puzzle, game);
-  if (modo === "diario") {
+  if (modo === "jornada") {
+    const antes = jornada.estrelas[fase] || 0;
+    const ganho = n > antes ? premioFase(fase, n) - (antes ? premioFase(fase, antes) : 0) : 0;
+    const bau = !antes && fase % BAU_A_CADA === 0 ? BAU_MOEDAS : 0;
+    jornada = { atual: Math.max(jornada.atual, fase + 1), estrelas: { ...jornada.estrelas, [fase]: Math.max(antes, n) } };
+    guardar("jornada", jornada);
+    premio = ganho + bau > 0 ? { moedas: ganho + bau, dobrado: false, bau } : null;
+    if (premio) carteira = ganhar(carteira, premio.moedas);
+    fasesSeguidas += 1;
+  } else if (modo === "diario") {
     let st = ler("stats", STATS_VAZIO);
     const dia = registrarDia(st, carteira, hoje);
     st = dia.stats;
@@ -435,7 +640,8 @@ function textoCompartilhar() {
   const n = stars(puzzle, game);
   const quadrados = game.words.map((_, i) => EMOJIS[i % EMOJIS.length]).join("");
   const dica = game.hints ? " 💡" : "";
-  return `Rota do Dia ${nomeDoDesafio().replace("Desafio ", "")} · ${LEVELS[nivel].nome} ${"⭐".repeat(n)}${dica}\n🟢${quadrados}🏁 ${game.words.length} palavras (meta ${puzzle.par})\n${location.origin}${location.pathname}`;
+  const nome = modo === "jornada" ? `· Fase ${fase}` : `${nomeDoDesafio().replace("Desafio ", "")} · ${LEVELS[nivel].nome}`;
+  return `Rota do Dia ${nome} ${"⭐".repeat(n)}${dica}\n🟢${quadrados}🏁 ${game.words.length} palavras (meta ${puzzle.par})\n${location.origin}${location.pathname}`;
 }
 
 let relogio;
@@ -445,7 +651,7 @@ function mostrarVitoria(comAnimacao) {
   $("vit-estrelas").innerHTML = [1, 2, 3]
     .map((i) => `<span class="${i <= n ? "" : "apagada"}" style="animation-delay:${comAnimacao ? i * 180 : 0}ms">⭐</span>`)
     .join("");
-  $("vit-resumo").textContent = `${game.words.length} palavras · meta ${puzzle.par}${game.hints ? " · com ajuda" : ""}`;
+  $("vit-resumo").textContent = `${modo === "jornada" ? `Fase ${fase} · ` : ""}${game.words.length} palavras · meta ${puzzle.par}${game.hints ? " · com ajuda" : ""}${premio?.bau ? " · 🎁 baú aberto!" : ""}`;
   $("vit-rota").innerHTML = $("trilha").innerHTML;
   $("vit-premio").hidden = !premio;
   if (premio) {
@@ -454,10 +660,11 @@ function mostrarVitoria(comAnimacao) {
     $("btn-dobrar").textContent = `▶ Dobrar com vídeo (+${premio.moedas})`;
   }
   const diario = modo === "diario";
-  $("btn-compartilhar").hidden = !diario;
+  $("btn-compartilhar").hidden = modo === "treino";
   $("vit-proximo").hidden = !diario;
   const proximoNivel = Object.keys(LEVELS).find((lv) => !ler(`dia:${hoje}:${lv}`, {})?.won);
-  $("btn-treinar").textContent = !diario ? "Novo treino" : proximoNivel ? `Jogar ${LEVELS[proximoNivel].nome}` : "Treinar mais";
+  $("btn-treinar").textContent = modo === "jornada" ? `Fase ${fase + 1} ▶`
+    : !diario ? "Novo treino" : proximoNivel ? `Jogar ${LEVELS[proximoNivel].nome}` : "Treinar mais";
   $("btn-treinar").dataset.nivel = diario ? proximoNivel || "" : "";
   clearInterval(relogio);
   if (diario) {
@@ -502,6 +709,12 @@ $("btn-compartilhar").addEventListener("click", async () => {
 
 $("btn-treinar").addEventListener("click", async () => {
   $("dlg-vitoria").close();
+  if (modo === "jornada") {
+    // anúncio de tela cheia a cada 3 fases vencidas (o Google ainda controla a frequência)
+    if (fasesSeguidas >= 3) { fasesSeguidas = 0; await intersticial("entre-fases"); }
+    fase += 1;
+    return carregar();
+  }
   const proximo = $("btn-treinar").dataset.nivel;
   if (proximo) return trocarNivel(proximo);
   // anúncio de tela cheia a cada 3 treinos vencidos (o Google ainda controla a frequência)
@@ -562,6 +775,15 @@ function usarAjuda(tipo, gratis = false) {
     aviso("🛡️ Escudo guardado");
     return abrirLoja();
   }
+  if (tipo === "vidas") {
+    if (vidasAgora(carteira).n >= MAX_VIDAS) return aviso("Suas vidas já estão cheias");
+    if (!pagar(PRECOS.vidas)) return;
+    carteira = ganharVida(carteira, MAX_VIDAS);
+    guardar("carteira", carteira);
+    aviso("❤️ Vidas cheias!");
+    vidasRecebidas();
+    return abrirLoja();
+  }
   if (travado) return aviso("Partida já vencida: a ajuda fica para a próxima");
   if (tipo === "proxima" && !solve(puzzle, game)) return aviso("Daqui não tem saída: desfaça a última palavra (grátis)", 3500);
   if (!gratis && !pagar(PRECOS[tipo])) return;
@@ -576,9 +798,11 @@ function abrirLoja() {
   atualizarSaldo();
   const hojeKey = dateKey();
   document.querySelectorAll("[data-ajuda]").forEach((b) => {
-    b.disabled = carteira.moedas < PRECOS[b.dataset.ajuda] || (b.dataset.ajuda !== "escudo" && travado);
+    b.disabled = carteira.moedas < PRECOS[b.dataset.ajuda] || (!["escudo", "vidas"].includes(b.dataset.ajuda) && travado);
   });
   const videos = anunciosAtivos();
+  $("btn-loja-vida").hidden = !videos;
+  $("btn-loja-vida").disabled = vidasAgora(carteira).n >= MAX_VIDAS || restante(carteira, hojeKey, "videoVida") <= 0;
   document.querySelectorAll("[data-video-ajuda]").forEach((b) => {
     b.hidden = !videos;
     b.disabled = travado || restante(carteira, hojeKey, "videoAjuda") <= 0;
@@ -684,6 +908,10 @@ $("btn-ok").addEventListener("click", () => trace.length >= 2 && confirmar());
 $("btn-limpar").addEventListener("click", () => { trace = []; desenhar(); });
 $("btn-desfazer").addEventListener("click", () => { trace = []; sugestao = []; game = undo(puzzle, game); salvar(); tom(330, 0.1); desenhar(); });
 $("btn-recomecar").addEventListener("click", () => {
+  if (modo === "jornada") {
+    if (jogadas > 0 && !confirm("Recomeçar a fase gasta 1 vida. Continuar?")) return;
+    return jogadas > 0 ? desistir() : carregar();
+  }
   trace = [];
   sugestao = [];
   game = { ...newGame(puzzle), hints: game.hints, blocked: game.blocked || [] };
@@ -692,8 +920,9 @@ $("btn-recomecar").addEventListener("click", () => {
   desenhar();
 });
 
-function trocarModo(novo) {
+function trocarModo(novo, faseEscolhida) {
   modo = novo;
+  if (novo === "jornada") fase = faseEscolhida || jornada.atual;
   document.querySelectorAll(".modo").forEach((b) => b.classList.toggle("ativo", b.dataset.modo === modo));
   carregar();
 }
@@ -703,6 +932,7 @@ function trocarNivel(novo) {
   carregar();
 }
 document.querySelectorAll(".modo").forEach((b) => b.addEventListener("click", () => {
+  if (b.dataset.modo === "jornada" && modo === "jornada") return abrirMapa();
   if (b.dataset.modo !== modo || modo === "treino") trocarModo(b.dataset.modo);
 }));
 document.querySelectorAll(".nivel").forEach((b) => b.addEventListener("click", () => trocarNivel(b.dataset.nivel)));
@@ -740,7 +970,9 @@ document.addEventListener("visibilitychange", () => {
 iniciarAnuncios({ pausar: () => { mudoPorAnuncio = true; }, retomar: () => { mudoPorAnuncio = false; } });
 aplicarTema();
 atualizarSom();
+document.querySelectorAll(".modo").forEach((b) => b.classList.toggle("ativo", b.dataset.modo === modo));
 carregar();
+atualizarVidas();
 fetch("palavras-validas.txt")
   .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
   .then((t) => { loadExtra(t); if (trace.length) desenhar(); (window.requestIdleCallback || setTimeout)(() => warmUp(puzzle)); })

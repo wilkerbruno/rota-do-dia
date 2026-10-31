@@ -127,7 +127,7 @@ export const LEVELS = {
  * Retorna { grid, start, finish, route: [{ word, cells }], par, level }.
  */
 export function makePuzzle(seedText, level = "medio") {
-  const { words, cells, dist } = LEVELS[level];
+  const { words, cells, dist } = typeof level === "string" ? LEVELS[level] : level;
   const rng = makeRng(hashSeed(seedText));
   for (let attempt = 0; attempt < 800; attempt++) {
     const chain = buildChain(rng, words, cells);
@@ -148,6 +148,45 @@ export function makePuzzle(seedText, level = "medio") {
     return { grid, start: path[0], finish: path[path.length - 1], route, par: chain.length, level };
   }
   throw new Error(`sem desafio para a semente ${seedText}`);
+}
+
+// ---- Jornada: fases numeradas que vão endurecendo ----
+
+/**
+ * Regras da fase n. `folga`: palavras além da rota oficial antes de perder. `pedras`: casas
+ * bloqueadas. `moedas`: casas que dão moeda ao passar. `obrigatoria`: precisa passar pela ⭐.
+ */
+export function faseRegras(n) {
+  const faixas = [
+    [5, { words: [2, 3], cells: [5, 7], dist: 2, folga: 3, pedras: 0, moedas: 1, obrigatoria: false }],
+    [10, { words: [3, 4], cells: [7, 9], dist: 3, folga: 2, pedras: 0, moedas: 2, obrigatoria: false }],
+    [20, { words: [3, 5], cells: [8, 11], dist: 3, folga: 2, pedras: 2, moedas: 2, obrigatoria: false }],
+    [30, { words: [4, 6], cells: [10, 12], dist: 3, folga: 1, pedras: 3, moedas: 2, obrigatoria: true }],
+    [45, { words: [5, 7], cells: [11, 14], dist: 4, folga: 1, pedras: 4, moedas: 3, obrigatoria: true }],
+    [Infinity, { words: [5, 7], cells: [12, 15], dist: 4, folga: 0, pedras: 5, moedas: 3, obrigatoria: true }],
+  ];
+  return faixas.find(([ate]) => n <= ate)[1];
+}
+
+/** Fase n da Jornada: mesmo tabuleiro para todo mundo, com pedras, moedas e casa obrigatória. */
+export function fasePuzzle(n) {
+  const regras = faseRegras(n);
+  const p = makePuzzle(`fase:${n}`, regras);
+  const rng = makeRng(hashSeed(`fase-extra:${n}`));
+  const naRota = new Set(p.route.flatMap((r) => r.cells));
+  const livres = shuffle(rng, p.grid.map((_, i) => i).filter((i) => !naRota.has(i)));
+  const pedras = livres.slice(0, regras.pedras);
+  const moedas = livres.slice(regras.pedras, regras.pedras + regras.moedas);
+  const meio = [...naRota].filter((c) => c !== p.start && c !== p.finish);
+  return {
+    ...p,
+    level: "fase",
+    fase: n,
+    maxPalavras: p.par + regras.folga,
+    pedras,
+    moedas,
+    obrigatoria: regras.obrigatoria ? meio[Math.floor(rng() * meio.length)] : null,
+  };
 }
 
 export function dateKey(d = new Date()) {
@@ -217,7 +256,9 @@ export function solve(puzzle, game, limit = 60000) {
   const pre = prefixes(puzzle);
   const fechadas = [...game.used, ...(game.blocked || [])];
   const start = { head: game.head, mask: fechadas.reduce((m, c) => m | (1 << c), 0), words: [] };
-  if (start.head === puzzle.finish) return [];
+  const req = puzzle.obrigatoria ?? null;
+  const chegou = (head, mask) => head === puzzle.finish && (req === null || (mask & (1 << req)) !== 0);
+  if (chegou(start.head, start.mask)) return [];
   const seen = new Set([`${start.head}:${start.mask}`]);
   let fila = [start];
   while (fila.length) {
@@ -226,8 +267,8 @@ export function solve(puzzle, game, limit = 60000) {
       for (const w of wordsFrom(puzzle, s.head, s.mask, pre)) {
         const head = w[w.length - 1];
         const words = [...s.words, w];
-        if (head === puzzle.finish) return words;
         const mask = w.reduce((m, c) => m | (1 << c), s.mask);
+        if (chegou(head, mask)) return words;
         const key = `${head}:${mask}`;
         if (seen.has(key)) continue;
         if (seen.size > limit) return null;
@@ -297,7 +338,9 @@ export function undo(puzzle, game) {
   };
 }
 
-export const isWon = (puzzle, game) => game.head === puzzle.finish;
+/** Venceu: está na chegada e, se a fase tiver casa obrigatória (⭐), passou por ela. */
+export const isWon = (puzzle, game) =>
+  game.head === puzzle.finish && (puzzle.obrigatoria == null || game.used.includes(puzzle.obrigatoria));
 
 /** Sem saída: nenhuma vizinha livre da cabeça. */
 export const isStuck = (puzzle, game) =>

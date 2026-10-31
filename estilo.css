@@ -15,6 +15,7 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+[hidden] { display: none !important; }
 
 html, body { margin: 0; min-height: 100%; }
 
@@ -200,6 +201,34 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 @keyframes pula { 40% { transform: scale(1.25); box-shadow: 0 0 30px #ffcc33aa; } }
 .seq { font-weight: 900; color: #ffb547; font-size: 15px; }
 .moeda-voa { position: fixed; z-index: 50; font-size: 26px; pointer-events: none; transition: transform .8s cubic-bezier(.5, -0.3, .7, 1), opacity .8s; }
+
+/* vidas e jornada */
+.vidas { display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px; background: #3a0d1c; border: 1px solid #ff5c7a88; font-weight: 900; }
+.vidas b { color: #ffb3c1; }
+.vidas small { color: var(--suave); font-weight: 800; font-variant-numeric: tabular-nums; }
+.modos.tres { grid-template-columns: 1fr 1.2fr .8fr; }
+.modos.tres .modo { font-size: 13px; }
+.faixa-fase { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--suave); font-weight: 800; }
+.mapa-btn { padding: 8px 12px; border-radius: 12px; background: #ffffff14; font-weight: 900; color: var(--texto); }
+.casa.pedra { background: repeating-linear-gradient(45deg, #2a2e45, #2a2e45 6px, #22263a 6px, #22263a 12px); color: #6b7194; }
+.casa.pedra::after { content: "🪨"; position: absolute; font-size: 26px; }
+.casa .selo-moeda, .casa .selo-estrela { position: absolute; bottom: 2px; right: 4px; font-size: 13px; }
+.casa.obrigatoria { box-shadow: 0 0 0 2px #ffcc33, 0 0 18px #ffcc3377; }
+.estrelas-total { font-weight: 900; color: #ffe27a; }
+.trilha-mapa { display: flex; flex-direction: column-reverse; gap: 6px; max-height: 60dvh; overflow-y: auto; padding: 8px 0; }
+.no-fase {
+  width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; font-size: 20px;
+  background: var(--tile); border: 2px solid var(--tile-borda); position: relative; flex: none;
+}
+.linha-fase { display: flex; align-items: center; gap: 10px; }
+.linha-fase:nth-child(4n+1) { padding-left: 8%; } .linha-fase:nth-child(4n+2) { padding-left: 34%; }
+.linha-fase:nth-child(4n+3) { padding-left: 60%; } .linha-fase:nth-child(4n) { padding-left: 34%; }
+.no-fase.feita { background: linear-gradient(180deg, #3cff9b, #1fae6a); color: #04110f; border-color: transparent; }
+.no-fase.atual { background: linear-gradient(180deg, #ffcc33, #ff8a3d); color: #1a0b00; animation: pulsa 1.4s infinite; border-color: #fff; }
+.no-fase.trancada { opacity: .4; }
+.no-fase small { position: absolute; bottom: -14px; font-size: 11px; letter-spacing: -1px; }
+.bau { font-size: 26px; }
+.derrota-selo { background: linear-gradient(90deg, #ff5c7a, #ffb547); -webkit-background-clip: text; background-clip: text; }
 
 /* níveis */
 .niveis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }

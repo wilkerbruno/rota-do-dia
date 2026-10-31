@@ -8,7 +8,13 @@ import { LEVELS } from "./puzzle.js";
 export const INICIAIS = 50;
 export const BONUS_DIARIO = [10, 15, 20, 25, 30, 40, 60]; // 7º dia em diante: 60
 export const VIDEO_MOEDAS = 25;
-export const LIMITES = { videoMoedas: 5, videoAjuda: 3, treinosPremiados: 10 };
+export const LIMITES = { videoMoedas: 5, videoAjuda: 3, treinosPremiados: 10, videoVida: 5 };
+
+// Vidas da Jornada: perder uma fase gasta 1; volta 1 a cada 20 minutos, até 5.
+export const MAX_VIDAS = 5;
+export const RECARGA_MS = 20 * 60 * 1000;
+export const BAU_A_CADA = 10; // baú de moedas a cada 10 fases
+export const BAU_MOEDAS = 50;
 export const TREINO_MOEDAS = 5;
 
 export const PRECOS = {
@@ -16,6 +22,8 @@ export const PRECOS = {
   apagar: 20, // apaga 5 casas que não servem para nada
   rota: 60, // mostra a rota oficial inteira
   escudo: 120, // guarda a sequência se faltar um dia
+  vidas: 60, // enche as vidas
+  palavrasExtras: 40, // +2 palavras quando a fase acaba
 };
 
 export const TEMAS = {
@@ -28,8 +36,36 @@ export const TEMAS = {
 /** Moedas por vencer o desafio do dia: base do nível + 5 por estrela. */
 export const premioVitoria = (level, estrelas) => LEVELS[level].moedas + 5 * estrelas;
 
+/** Moedas pela primeira vitória numa fase (e pela melhora de estrelas depois). */
+export const premioFase = (fase, estrelas) => 5 + 3 * estrelas + 2 * Math.floor((fase - 1) / 10);
+
 export function novaCarteira() {
-  return { moedas: INICIAIS, escudos: 0, temas: ["neon"], tema: "neon", bonus: null, hoje: null };
+  return {
+    moedas: INICIAIS, escudos: 0, temas: ["neon"], tema: "neon", bonus: null, hoje: null,
+    vidas: { n: MAX_VIDAS, desde: 0 },
+  };
+}
+
+/** Vidas agora, já somando a recarga do tempo. Devolve { carteira, n, proxima (ms até a próxima) }. */
+export function vidasAgora(carteira, agora = Date.now()) {
+  const v = carteira.vidas || { n: MAX_VIDAS, desde: 0 };
+  if (v.n >= MAX_VIDAS) return { carteira: { ...carteira, vidas: { n: MAX_VIDAS, desde: 0 } }, n: MAX_VIDAS, proxima: 0 };
+  const ganhas = Math.floor((agora - v.desde) / RECARGA_MS);
+  const n = Math.min(MAX_VIDAS, v.n + ganhas);
+  const desde = n >= MAX_VIDAS ? 0 : v.desde + ganhas * RECARGA_MS;
+  return { carteira: { ...carteira, vidas: { n, desde } }, n, proxima: n >= MAX_VIDAS ? 0 : desde + RECARGA_MS - agora };
+}
+
+export function perderVida(carteira, agora = Date.now()) {
+  const { carteira: c, n } = vidasAgora(carteira, agora);
+  if (n <= 0) return null;
+  return { ...c, vidas: { n: n - 1, desde: n >= MAX_VIDAS ? agora : c.vidas.desde } };
+}
+
+export function ganharVida(carteira, quantas = 1, agora = Date.now()) {
+  const { carteira: c, n } = vidasAgora(carteira, agora);
+  const novo = Math.min(MAX_VIDAS, n + quantas);
+  return { ...c, vidas: { n: novo, desde: novo >= MAX_VIDAS ? 0 : c.vidas.desde } };
 }
 
 const ontemDe = (key) => {

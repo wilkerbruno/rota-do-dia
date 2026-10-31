@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
-  INICIAIS, LIMITES, PRECOS, bonusDiario, comprarTema, gastar, ganhar, novaCarteira, premioVitoria,
-  registrarDia, restante, usarCota,
+  INICIAIS, LIMITES, MAX_VIDAS, PRECOS, RECARGA_MS, bonusDiario, comprarTema, gastar, ganhar,
+  ganharVida, novaCarteira, perderVida, premioFase, premioVitoria, registrarDia, restante, usarCota,
+  vidasAgora,
 } from "../carteira.js";
 
 test("carteira nova começa com saldo e tema padrão", () => {
@@ -53,6 +54,26 @@ test("tema: compra uma vez, depois só troca", () => {
   c = comprarTema(c, "oceano");
   assert.equal(c.moedas, INICIAIS + 50);
   assert.equal(comprarTema(c, "ouro"), null);
+});
+
+test("vidas: perder gasta, recarrega 1 a cada 20 min até 5, acabou bloqueia", () => {
+  const t0 = 1_000_000;
+  let c = novaCarteira();
+  assert.equal(vidasAgora(c, t0).n, MAX_VIDAS);
+  for (let i = 0; i < MAX_VIDAS; i++) c = perderVida(c, t0);
+  assert.equal(vidasAgora(c, t0).n, 0);
+  assert.equal(perderVida(c, t0), null);
+  assert.equal(vidasAgora(c, t0 + RECARGA_MS - 1).n, 0);
+  assert.equal(vidasAgora(c, t0 + RECARGA_MS).n, 1);
+  assert.equal(vidasAgora(c, t0 + 2 * RECARGA_MS + 5).proxima, RECARGA_MS - 5);
+  assert.equal(vidasAgora(c, t0 + 99 * RECARGA_MS).n, MAX_VIDAS);
+  assert.equal(vidasAgora(ganharVida(c, 1, t0), t0).n, 1);
+  assert.equal(vidasAgora(ganharVida(c, MAX_VIDAS, t0), t0).n, MAX_VIDAS);
+});
+
+test("prêmio de fase cresce com estrelas e com a fase", () => {
+  assert.ok(premioFase(1, 3) > premioFase(1, 1));
+  assert.ok(premioFase(25, 3) > premioFase(5, 3));
 });
 
 test("sequência: dia seguido soma, escudo cobre um dia de falta, sem escudo zera", () => {
