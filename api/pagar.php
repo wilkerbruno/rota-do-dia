@@ -40,9 +40,8 @@ if ($metodo === 'pix') {
 if (!empty($f['token'])) { // cartão
     $corpo['token'] = (string)$f['token'];
     $corpo['installments'] = 1;
-    if (!empty($f['issuer_id'])) {
-        $corpo['issuer_id'] = (string)$f['issuer_id'];
-    }
+    // sem issuer_id: o Mercado Pago descobre o emissor pelo BIN. Mandar o do Brick pode dar
+    // erro 10111 (forced_issuer) quando ele não bate com o cartão.
     $doc = $f['payer']['identification'] ?? null;
     if (is_array($doc) && !empty($doc['type']) && !empty($doc['number'])) {
         $corpo['payer']['identification'] = ['type' => (string)$doc['type'], 'number' => (string)$doc['number']];
