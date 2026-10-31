@@ -49,7 +49,14 @@ function cfg_ok(): bool
 function pode_vender(): bool
 {
     $c = cfg();
-    return cfg_ok() && (($c['LOJA_PUBLICA'] ?? '0') === '1' || ($c['MP_AMBIENTE'] ?? '') === 'teste');
+    if (!cfg_ok()) {
+        return false;
+    }
+    if (($c['MP_AMBIENTE'] ?? '') === 'teste') {
+        // trava: em modo teste só vale credencial de teste, para nunca cobrar de verdade por engano
+        return strpos($c['MP_ACCESS_TOKEN'], 'TEST-') === 0;
+    }
+    return ($c['LOJA_PUBLICA'] ?? '0') === '1';
 }
 
 function responder(int $codigo, array $dados): void
