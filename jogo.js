@@ -9,7 +9,10 @@ import {
   bonusDiario, comprarTema, gastar, ganhar, ganharVida, novaCarteira, perderVida, premioFase,
   premioVitoria, registrarDia, restante, usarCota, vidasAgora,
 } from "./carteira.js";
-import { anunciosAtivos, iniciarAnuncios, intersticial, videoPremiado } from "./anuncios.js";
+import { anunciosAtivos, desligarIntersticial, iniciarAnuncios, intersticial, videoPremiado } from "./anuncios.js";
+import {
+  abrirPagamento, ambienteTeste, codigoRecuperacao, fecharPagamento, iniciarLoja, pacotes, recuperar, sincronizar,
+} from "./loja.js";
 
 const CORES = ["#3cff9b", "#4dd7ff", "#ff6ad5", "#ffb547", "#a78bfa", "#ff5c7a"];
 const EMOJIS = ["🟩", "🟦", "🟪", "🟧", "🟨", "🟥"];
@@ -819,8 +822,111 @@ function abrirLoja() {
       ${t.nome}<small>${carteira.tema === id ? "Em uso" : tem ? "Usar" : `🪙 ${t.preco}`}</small></button>`;
   }).join("");
   pintarAmostras();
+  desenharLojaPaga();
   if (!$("dlg-loja").open) $("dlg-loja").showModal();
 }
+
+// ---------- loja paga (Mercado Pago) ----------
+let lojaAtiva = false;
+let semAnunciosComprado = ler("semAnuncios", false);
+let pollPix = null;
+
+function desenharLojaPaga() {
+  $("loja-paga").hidden = !lojaAtiva;
+  if (!lojaAtiva) return;
+  $("tag-teste").hidden = !ambienteTeste();
+  $("pacotes").innerHTML = pacotes().map((p) => {
+    const tem = p.semAnuncios && semAnunciosComprado;
+    const fita = p.id === "p800" ? '<em class="fita">MAIS VENDIDO</em>' : "";
+    const titulo = p.moedas ? `🪙 ${p.moedas.toLocaleString("pt-BR")}` : "🚫 Anúncios";
+    const sub = p.moedas ? "moedas" : "sem tela cheia, para sempre";
+    return `<button class="pacote" data-pacote="${p.id}" ${tem ? "disabled" : ""}>${fita}<b>${titulo}</b><span>${sub}</span>
+      <i>${tem ? "Já é seu" : p.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</i></button>`;
+  }).join("");
+  const cod = codigoRecuperacao();
+  $("meu-codigo").textContent = cod ? `Seu código de recuperação: ${cod}. Guarde para recuperar compras em outro celular.` : "Seu código aparece aqui depois da primeira compra.";
+}
+
+async function sincronizarCompras(silencioso = false) {
+  const r = await sincronizar();
+  if (r.semAnuncios) { semAnunciosComprado = true; desligarIntersticial(true); }
+  if (r.outroAparelho && !silencioso) aviso("Suas compras foram recuperadas em outro aparelho");
+  if (r.novasMoedas > 0) {
+    carteira = ganhar(carteira, r.novasMoedas);
+    guardar("carteira", carteira);
+    moedasVoando($("btn-moedas"), r.novasMoedas);
+    aviso(`+${r.novasMoedas} moedas da sua compra! Obrigado 💛`, 4000);
+  }
+  return r;
+}
+
+function pararPix() { clearInterval(pollPix); pollPix = null; }
+
+async function abrirCompra(pacoteId) {
+  const p = pacotes().find((x) => x.id === pacoteId);
+  $("pag-titulo").textContent = p.nome;
+  $("pag-preco").textContent = p.preco.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  $("pag-pix").hidden = true;
+  $("brick-pagamento").hidden = false;
+  $("pag-msg").textContent = ambienteTeste() ? "Modo teste: use os dados de teste do Mercado Pago. Nenhum valor é cobrado." : "";
+  $("dlg-loja").close();
+  $("dlg-pagamento").showModal();
+  try {
+    await abrirPagamento($("brick-pagamento"), pacoteId, aoPagar);
+  } catch {
+    $("pag-msg").textContent = "Não foi possível abrir o pagamento agora. Tente de novo em instantes.";
+  }
+}
+
+async function aoPagar(r) {
+  if (r.erro) { $("pag-msg").textContent = r.erro; return; }
+  if (r.status === "approved") {
+    await fecharPagamento();
+    await sincronizarCompras();
+    $("dlg-pagamento").close();
+    confete();
+    return;
+  }
+  if (r.status === "rejected") { $("pag-msg").textContent = "Pagamento recusado. Tente outro cartão ou o Pix."; return; }
+  // Pix (pending) ou cartão em análise: espera a confirmação
+  await fecharPagamento();
+  $("brick-pagamento").hidden = true;
+  if (r.pix?.qrBase64) {
+    $("pag-pix").hidden = false;
+    $("pix-qr").src = `data:image/png;base64,${r.pix.qrBase64}`;
+    $("btn-pix-copiar").onclick = async () => {
+      try { await navigator.clipboard.writeText(r.pix.copiaECola); aviso("Código Pix copiado! Cole no app do seu banco"); }
+      catch { aviso("Não deu para copiar; use o QR code"); }
+    };
+  } else {
+    $("pag-msg").textContent = "Pagamento em análise. As moedas entram assim que for aprovado.";
+  }
+  pararPix();
+  const inicio = Date.now();
+  pollPix = setInterval(async () => {
+    if (!$("dlg-pagamento").open || Date.now() - inicio > 15 * 60 * 1000) return pararPix();
+    const s = await sincronizarCompras(true);
+    if (s.novasMoedas > 0 || (s.semAnuncios && !s.pendentes)) {
+      pararPix();
+      $("dlg-pagamento").close();
+      confete();
+    }
+  }, 5000);
+}
+
+$("pacotes").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pacote]");
+  if (b && !b.disabled) abrirCompra(b.dataset.pacote);
+});
+$("btn-pag-fechar").addEventListener("click", () => $("dlg-pagamento").close());
+$("dlg-pagamento").addEventListener("close", () => { pararPix(); fecharPagamento(); });
+$("btn-recuperar").addEventListener("click", async () => {
+  const ok = await recuperar($("codigo-recuperar").value);
+  if (!ok) return aviso("Código não encontrado");
+  await sincronizarCompras();
+  aviso("Compras recuperadas neste aparelho");
+  desenharLojaPaga();
+});
 
 const AMOSTRAS = {
   neon: ["#263066", "#3cff9b", "#ff6ad5"], oceano: ["#0a466e", "#4dd7ff", "#7cf2d0"],
@@ -968,6 +1074,8 @@ document.addEventListener("visibilitychange", () => {
 
 // ---------- início ----------
 iniciarAnuncios({ pausar: () => { mudoPorAnuncio = true; }, retomar: () => { mudoPorAnuncio = false; } });
+desligarIntersticial(semAnunciosComprado);
+iniciarLoja().then((visivel) => { lojaAtiva = visivel; if (ler("jogador", null)) sincronizarCompras(true); }).catch(() => {});
 aplicarTema();
 atualizarSom();
 document.querySelectorAll(".modo").forEach((b) => b.classList.toggle("ativo", b.dataset.modo === modo));

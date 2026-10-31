@@ -1,8 +1,8 @@
 // Cache para abrir rápido e funcionar offline. Troque VERSAO a cada publicação.
-const VERSAO = "rota-v6";
+const VERSAO = "rota-v7";
 const ARQUIVOS = [
-  "./", "index.html", "estilo.css", "jogo.js", "puzzle.js", "palavras.js", "palavras-validas.txt", "privacidade.html",
-  "carteira.js", "anuncios.js", "config.js",
+  "./", "index.html", "estilo.css", "jogo.js", "puzzle.js", "palavras.js", "palavras-validas.txt", "privacidade.html", "termos.html",
+  "carteira.js", "anuncios.js", "config.js", "loja.js",
   "manifest.webmanifest", "icones/icone.svg", "icones/icone-192.png", "icones/icone-512.png",
 ];
 

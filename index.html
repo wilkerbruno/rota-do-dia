@@ -138,6 +138,21 @@
       <span class="moedas fixo">🪙 <b id="loja-saldo">0</b></span>
     </div>
 
+    <section id="loja-paga" hidden>
+      <h3>Pacotes de moedas <span class="tag-teste" id="tag-teste" hidden>MODO TESTE</span></h3>
+      <div class="pacotes" id="pacotes"></div>
+      <p class="nota">Pagamento por Pix ou cartão, dentro do jogo, pelo Mercado Pago. Moedas valem só no jogo e não
+        se trocam por dinheiro. <a href="termos.html" target="_blank">Termos de compra</a>.</p>
+      <details class="recuperar">
+        <summary>Trocou de celular? Recuperar compras</summary>
+        <p class="nota" id="meu-codigo"></p>
+        <div class="linha-botoes">
+          <input id="codigo-recuperar" placeholder="XXXX-XXXX-XXXX" maxlength="14" autocomplete="off">
+          <button class="secundario" id="btn-recuperar">Recuperar</button>
+        </div>
+      </details>
+    </section>
+
     <h3>Para esta partida</h3>
     <div class="itens">
       <div class="item">
@@ -199,6 +214,22 @@
 
     <p class="nota">Moedas valem só dentro do jogo: não se compram nem se trocam por dinheiro.</p>
     <button class="grande" data-fechar>Voltar ao jogo</button>
+  </dialog>
+
+  <dialog id="dlg-pagamento" class="dlg pagamento">
+    <div class="loja-topo">
+      <h2 id="pag-titulo">Comprar</h2>
+      <b class="pag-preco" id="pag-preco"></b>
+    </div>
+    <div id="brick-pagamento"></div>
+    <div id="pag-pix" class="pag-pix" hidden>
+      <p class="selo">Pague com Pix</p>
+      <img id="pix-qr" alt="QR code do Pix">
+      <button class="grande" id="btn-pix-copiar">Copiar código Pix</button>
+      <p class="nota" id="pix-status">Aguardando o pagamento… as moedas entram sozinhas.</p>
+    </div>
+    <p class="nota" id="pag-msg"></p>
+    <button class="secundario largo" id="btn-pag-fechar">Fechar</button>
   </dialog>
 
   <dialog id="dlg-mapa" class="dlg mapa">

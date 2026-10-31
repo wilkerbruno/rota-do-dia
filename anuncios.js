@@ -9,6 +9,8 @@
 import { ADSENSE_CLIENT, FREQUENCIA_INTERSTICIAL } from "./config.js";
 
 let modo = "off";
+let semIntersticial = false; // comprou "sem anúncios": tela cheia some; vídeo premiado continua opcional
+export const desligarIntersticial = (v) => { semIntersticial = !!v; };
 let aoPausar = () => {};
 let aoRetomar = () => {};
 
@@ -70,7 +72,7 @@ export function videoPremiado(nome) {
 
 /** Anúncio de tela cheia entre partidas. O Google decide se mostra (frequência). */
 export function intersticial(nome) {
-  if (modo === "off") return Promise.resolve();
+  if (modo === "off" || semIntersticial) return Promise.resolve();
   if (modo === "teste") return simular(false).then(() => {});
   return new Promise((resolve) => {
     window.adBreak({ type: "next", name: nome, beforeAd: aoPausar, afterAd: aoRetomar, adBreakDone: () => resolve() });
