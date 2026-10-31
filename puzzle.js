@@ -89,18 +89,18 @@ function buildChain(rng, words, cells) {
   return total >= cells[0] && total <= cells[1] ? chain : null;
 }
 
-/** Caminho sem repetir casa, de tamanho exato, com início e fim afastados. */
-function placePath(rng, length) {
+/** Caminho sem repetir casa, de tamanho exato, com início e fim a pelo menos `dist` casas. */
+function placePath(rng, length, dist) {
   const start = Math.floor(rng() * SIZE * SIZE);
   const path = [start];
   const seen = new Set(path);
   let steps = 0;
   const walk = () => {
-    if (++steps > 4000) return false;
+    if (++steps > 6000) return false;
     if (path.length === length) {
       const [r0, c0] = rowCol(path[0]);
       const [r1, c1] = rowCol(path[path.length - 1]);
-      return Math.max(Math.abs(r0 - r1), Math.abs(c0 - c1)) >= 3;
+      return Math.max(Math.abs(r0 - r1), Math.abs(c0 - c1)) >= dist;
     }
     for (const n of shuffle(rng, neighbors(path[path.length - 1]))) {
       if (seen.has(n)) continue;
@@ -115,17 +115,25 @@ function placePath(rng, length) {
   return walk() ? path : null;
 }
 
+/** Tamanho da rota oficial por nível: palavras, casas e distância mínima entre início e chegada. */
+export const LEVELS = {
+  facil: { nome: "Fácil", words: [2, 3], cells: [5, 7], dist: 2, moedas: 10 },
+  medio: { nome: "Médio", words: [3, 5], cells: [8, 11], dist: 3, moedas: 20 },
+  dificil: { nome: "Difícil", words: [5, 7], cells: [12, 15], dist: 4, moedas: 35 },
+};
+
 /**
- * Desafio determinístico para a semente. `words` e `cells` controlam o tamanho da rota oficial.
- * Retorna { grid, start, finish, route: [{ word, cells }], par }.
+ * Desafio determinístico para a semente e o nível.
+ * Retorna { grid, start, finish, route: [{ word, cells }], par, level }.
  */
-export function makePuzzle(seedText, { words = [3, 5], cells = [8, 11] } = {}) {
+export function makePuzzle(seedText, level = "medio") {
+  const { words, cells, dist } = LEVELS[level];
   const rng = makeRng(hashSeed(seedText));
-  for (let attempt = 0; attempt < 500; attempt++) {
+  for (let attempt = 0; attempt < 800; attempt++) {
     const chain = buildChain(rng, words, cells);
     if (!chain) continue;
     const length = chain.reduce((n, w) => n + w.length, 0) - (chain.length - 1);
-    const path = placePath(rng, length);
+    const path = placePath(rng, length, dist);
     if (!path) continue;
 
     const grid = Array.from({ length: SIZE * SIZE }, () => pick(rng, SYLLABLES));
@@ -137,7 +145,7 @@ export function makePuzzle(seedText, { words = [3, 5], cells = [8, 11] } = {}) {
       route.push({ word: w.join("-"), cells: wordCells });
       at += w.length - 1;
     }
-    return { grid, start: path[0], finish: path[path.length - 1], route, par: chain.length };
+    return { grid, start: path[0], finish: path[path.length - 1], route, par: chain.length, level };
   }
   throw new Error(`sem desafio para a semente ${seedText}`);
 }
@@ -152,8 +160,95 @@ export function dayNumber(key) {
   return Math.round(ms / 86400000) + 1;
 }
 
-export function dailyPuzzle(key = dateKey()) {
-  return makePuzzle(`rota-do-dia:${key}`);
+export function dailyPuzzle(key = dateKey(), level = "medio") {
+  return makePuzzle(`rota-do-dia:${level}:${key}`, level);
+}
+
+// ---- solucionador (para as ajudas) ----
+
+const MAX_SYL = 6;
+const prefixCache = new WeakMap();
+
+/** Prefixos das palavras que só usam sílabas presentes no tabuleiro: corta a busca cedo. */
+function prefixes(puzzle) {
+  let set = prefixCache.get(puzzle);
+  if (set && set.extra === EXTRA.size) return set;
+  set = new Set();
+  set.extra = EXTRA.size;
+  const noGrid = new Set(puzzle.grid);
+  const add = (w) => {
+    const s = w.split("-");
+    if (s.length > MAX_SYL || !s.every((x) => noGrid.has(x))) return;
+    for (let i = 1; i <= s.length; i++) set.add(s.slice(0, i).join("-"));
+  };
+  DICT.forEach(add);
+  EXTRA.forEach(add);
+  prefixCache.set(puzzle, set);
+  return set;
+}
+
+/** Todas as palavras que dá para traçar saindo de `head` sem passar por casa usada (bitmask). */
+function wordsFrom(puzzle, head, mask, pre) {
+  const out = [];
+  const trace = [head];
+  const walk = (key) => {
+    if (trace.length >= 2 && isWord(key)) out.push(trace.slice());
+    if (trace.length === MAX_SYL) return;
+    for (const n of NEIGHBORS[trace[trace.length - 1]]) {
+      if (mask & (1 << n) || trace.includes(n)) continue;
+      const k = `${key}-${puzzle.grid[n]}`;
+      if (!pre.has(k)) continue;
+      trace.push(n);
+      walk(k);
+      trace.pop();
+    }
+  };
+  walk(puzzle.grid[head]);
+  return out;
+}
+
+const NEIGHBORS = Array.from({ length: SIZE * SIZE }, (_, c) => neighbors(c));
+
+/**
+ * Menor sequência de palavras da posição atual até a chegada (busca em largura), ou null se não
+ * houver saída. `limit` protege o celular de buscas longas.
+ */
+export function solve(puzzle, game, limit = 60000) {
+  const pre = prefixes(puzzle);
+  const fechadas = [...game.used, ...(game.blocked || [])];
+  const start = { head: game.head, mask: fechadas.reduce((m, c) => m | (1 << c), 0), words: [] };
+  if (start.head === puzzle.finish) return [];
+  const seen = new Set([`${start.head}:${start.mask}`]);
+  let fila = [start];
+  while (fila.length) {
+    const prox = [];
+    for (const s of fila) {
+      for (const w of wordsFrom(puzzle, s.head, s.mask, pre)) {
+        const head = w[w.length - 1];
+        const words = [...s.words, w];
+        if (head === puzzle.finish) return words;
+        const mask = w.reduce((m, c) => m | (1 << c), s.mask);
+        const key = `${head}:${mask}`;
+        if (seen.has(key)) continue;
+        if (seen.size > limit) return null;
+        seen.add(key);
+        prox.push({ head, mask, words });
+      }
+    }
+    fila = prox;
+  }
+  return null;
+}
+
+/** Prepara a busca das ajudas antes do clique (a primeira vez leva uns décimos de segundo). */
+export const warmUp = (puzzle) => void prefixes(puzzle);
+
+/** Casas que não aparecem na solução mais curta nem na rota oficial (para a ajuda "apagar casas"). */
+export function uselessCells(puzzle, game, solution) {
+  const keep = new Set([
+    ...puzzle.route.flatMap((r) => r.cells), ...(solution || []).flat(), ...game.used, ...(game.blocked || []),
+  ]);
+  return puzzle.grid.map((_, i) => i).filter((i) => !keep.has(i));
 }
 
 // ---- estado da partida (imutável) ----
@@ -165,7 +260,8 @@ export function newGame(puzzle) {
 /** Pode acrescentar `cell` ao traço atual (que começa na cabeça)? */
 export function canExtend(game, trace, cell) {
   if (!trace.length) return cell === game.head;
-  return isAdjacent(trace[trace.length - 1], cell) && !trace.includes(cell) && !game.used.includes(cell);
+  return isAdjacent(trace[trace.length - 1], cell) && !trace.includes(cell) && !game.used.includes(cell)
+    && !(game.blocked || []).includes(cell);
 }
 
 export function traceWord(puzzle, trace) {

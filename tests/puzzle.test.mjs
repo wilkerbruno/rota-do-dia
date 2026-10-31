@@ -4,8 +4,8 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import {
-  DICT, WORDS, dailyPuzzle, dayNumber, isAdjacent, isStuck, isWon, isWord, loadExtra, makePuzzle,
-  newGame, stars, submit, undo,
+  DICT, LEVELS, WORDS, dailyPuzzle, dayNumber, isAdjacent, isStuck, isWon, isWord, loadExtra,
+  makePuzzle, neighbors, newGame, solve, stars, submit, undo, uselessCells,
 } from "../puzzle.js";
 
 test("dicionário completo aceita palavras fora da lista básica", () => {
@@ -82,6 +82,49 @@ test("estrelas caem com palavra extra ou dica", () => {
   assert.equal(stars(p, { ...won, hints: 1 }), 2);
   assert.equal(stars(p, { ...won, words: [...won.words, won.words[0]] }), 2);
   assert.equal(isStuck(p, won), false);
+});
+
+test("três níveis geram um ano de desafios com rota oficial vencível", () => {
+  for (const level of Object.keys(LEVELS)) {
+    const { words, cells } = LEVELS[level];
+    const day = new Date("2026-11-01T12:00:00");
+    for (let i = 0; i < 365; i++) {
+      const p = dailyPuzzle(day.toISOString().slice(0, 10), level);
+      assert.ok(p.par >= words[0] && p.par <= words[1], `${level} par ${p.par}`);
+      const len = p.route.reduce((n, r) => n + r.cells.length, 0) - (p.route.length - 1);
+      assert.ok(len >= cells[0] && len <= cells[1], `${level} ${len} casas`);
+      assert.ok(isWon(p, play(p)));
+      day.setDate(day.getDate() + 1);
+    }
+  }
+});
+
+test("solucionador acha caminho até a chegada, no máximo do tamanho da rota oficial", () => {
+  for (const level of Object.keys(LEVELS)) {
+    for (let i = 0; i < 40; i++) {
+      const p = makePuzzle(`solver-${level}-${i}`, level);
+      let game = newGame(p);
+      const sol = solve(p, game);
+      assert.ok(sol && sol.length <= p.par, `${level} ${i}: ${sol?.length} > ${p.par}`);
+      for (const w of sol) {
+        const r = submit(p, game, w);
+        assert.ok(r.ok);
+        game = r.game;
+      }
+      assert.ok(isWon(p, game));
+      // a partir do meio da rota oficial também
+      const meio = submit(p, newGame(p), p.route[0].cells).game;
+      assert.ok(solve(p, meio));
+    }
+  }
+});
+
+test("sem saída: solucionador devolve null", () => {
+  const p = makePuzzle("preso");
+  const viz = neighbors(p.start);
+  const preso = { ...newGame(p), used: [p.start, ...viz] };
+  assert.equal(solve(p, preso), null);
+  assert.ok(uselessCells(p, newGame(p), solve(p, newGame(p))).every((c) => !p.route[0].cells.includes(c)));
 });
 
 test("treino: sementes aleatórias também geram desafio", () => {

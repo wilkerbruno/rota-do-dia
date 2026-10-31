@@ -2,7 +2,7 @@
 // Contador anônimo do Rota do Dia. Recebe só: evento, número do desafio e se o aparelho jogou ontem.
 // Não grava IP, cookie, identificador nem user agent. Soma por dia num JSON fora da pasta pública.
 //
-// Corpo: {"e":"inicio|vitoria|compartilhar","d":<nº do desafio>,"r":0|1}
+// Corpo: {"e":"inicio|vitoria|compartilhar|video","d":<nº do desafio>,"r":0|1}
 
 header('Content-Type: application/json');
 header('Cache-Control: no-store');
@@ -14,7 +14,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
 
 $raw = file_get_contents('php://input', false, null, 0, 200);
 $in = json_decode($raw ?: '', true);
-$eventos = ['inicio', 'vitoria', 'compartilhar'];
+$eventos = ['inicio', 'vitoria', 'compartilhar', 'video'];
 
 if (!is_array($in) || !in_array($in['e'] ?? null, $eventos, true)
     || !is_int($in['d'] ?? null) || $in['d'] < 1 || $in['d'] > 100000

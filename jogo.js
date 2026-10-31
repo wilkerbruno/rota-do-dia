@@ -1,8 +1,14 @@
-// Interface do Rota do Dia: tabuleiro, traço por arrasto ou toque, som, confete, estatísticas.
+// Interface do Rota do Dia: tabuleiro, traço por arrasto ou toque, níveis, moedas, ajudas, loja,
+// vídeos premiados, som, confete e estatísticas.
 import {
-  canExtend, dailyPuzzle, dateKey, dayNumber, isStuck, isWon, isWord, loadExtra, makePuzzle, newGame,
-  stars, submit, traceWord, undo,
+  LEVELS, canExtend, dailyPuzzle, dateKey, dayNumber, isStuck, isWon, isWord, loadExtra, makePuzzle,
+  newGame, solve, stars, submit, traceWord, undo, uselessCells, warmUp,
 } from "./puzzle.js";
+import {
+  BONUS_DIARIO, PRECOS, TEMAS, TREINO_MOEDAS, VIDEO_MOEDAS, bonusDiario, comprarTema, gastar, ganhar,
+  novaCarteira, premioVitoria, registrarDia, restante, usarCota,
+} from "./carteira.js";
+import { anunciosAtivos, iniciarAnuncios, intersticial, videoPremiado } from "./anuncios.js";
 
 const CORES = ["#3cff9b", "#4dd7ff", "#ff6ad5", "#ffb547", "#a78bfa", "#ff5c7a"];
 const EMOJIS = ["🟩", "🟦", "🟪", "🟧", "🟨", "🟥"];
@@ -14,21 +20,30 @@ const guardar = (k, v) => { try { localStorage.setItem(`rota:v1:${k}`, JSON.stri
 const ler = (k, padrao) => {
   try { const v = localStorage.getItem(`rota:v1:${k}`); return v ? JSON.parse(v) : padrao; } catch { return padrao; }
 };
+const STATS_VAZIO = { jogos: 0, vitorias: 0, seq: 0, melhor: 0, estrelas: { 1: 0, 2: 0, 3: 0 } };
 
 // ---------- estado ----------
 let modo = "diario";
+let nivel = LEVELS[ler("nivel", "medio")] ? ler("nivel", "medio") : "medio";
 let hoje = dateKey();
 let puzzle, game, trace = [], arrastando = false, cresceuNoArrasto = false, travado = false;
+let sugestao = [];
+let premio = null; // { moedas, dobrado } da partida vencida
+let treinosSeguidos = 0;
+let carteira = ler("carteira", null) || novaCarteira();
 let somLigado = ler("som", true);
+let mudoPorAnuncio = false;
 
 const tabuleiro = $("tabuleiro");
 const svg = $("linhas");
 let casas = [];
 
+function salvarCarteira() { guardar("carteira", carteira); atualizarSaldo(); }
+
 // ---------- som ----------
 let audio;
 function tom(freq, dur = 0.12, tipo = "triangle", vol = 0.12, quando = 0) {
-  if (!somLigado) return;
+  if (!somLigado || mudoPorAnuncio) return;
   try {
     audio ||= new (window.AudioContext || window.webkitAudioContext)();
     const t = audio.currentTime + quando;
@@ -50,8 +65,9 @@ const somPasso = (i) => tom(NOTAS[Math.min(i, NOTAS.length - 1)], 0.09, "sine", 
 const somAcerto = () => [0, 2, 4, 7].forEach((n, i) => tom(NOTAS[n], 0.18, "triangle", 0.12, i * 0.06));
 const somErro = () => { tom(160, 0.18, "sawtooth", 0.06); tom(120, 0.22, "sawtooth", 0.05, 0.08); };
 const somVitoria = () => [0, 2, 4, 5, 7, 9].forEach((n, i) => tom(NOTAS[n], 0.3, "triangle", 0.13, i * 0.09));
+const somMoeda = () => [7, 9].forEach((n, i) => tom(NOTAS[n] * 1.5, 0.12, "square", 0.05, i * 0.07));
 
-// ---------- confete ----------
+// ---------- confete e moedas voando ----------
 function confete() {
   const cv = $("confete");
   const ctx = cv.getContext("2d");
@@ -78,6 +94,29 @@ function confete() {
   })(inicio);
 }
 
+/** Moedas saem de `origem` e voam até o saldo; o número sobe quando chegam. */
+function moedasVoando(origem, valor) {
+  const alvo = $("btn-moedas").getBoundingClientRect();
+  const de = origem?.getBoundingClientRect?.() || { left: innerWidth / 2, top: innerHeight / 2, width: 0, height: 0 };
+  const n = Math.min(10, Math.max(3, Math.round(valor / 8)));
+  for (let i = 0; i < n; i++) {
+    const m = document.createElement("span");
+    m.className = "moeda-voa";
+    m.textContent = "🪙";
+    m.style.left = `${de.left + de.width / 2 + (Math.random() - 0.5) * 60}px`;
+    m.style.top = `${de.top + de.height / 2 + (Math.random() - 0.5) * 30}px`;
+    document.body.appendChild(m);
+    setTimeout(() => {
+      const r = m.getBoundingClientRect();
+      m.style.transform = `translate(${alvo.left + 16 - r.left}px, ${alvo.top + 4 - r.top}px) scale(.6)`;
+      m.style.opacity = "0.2";
+    }, 30 + i * 60);
+    setTimeout(() => m.remove(), 950 + i * 60);
+  }
+  setTimeout(() => { somMoeda(); $("btn-moedas").classList.add("pula"); atualizarSaldo(); }, 800);
+  setTimeout(() => $("btn-moedas").classList.remove("pula"), 1500);
+}
+
 // ---------- aviso ----------
 let toastTimer;
 function aviso(texto, ms = 2200) {
@@ -90,7 +129,7 @@ function aviso(texto, ms = 2200) {
 
 // ---------- contador anônimo (sem cookie e sem identificador) ----------
 function evento(e) {
-  if (modo !== "diario" || dayNumber(hoje) < 1 || /^(localhost|127\.)/.test(location.hostname) || location.protocol === "file:") return;
+  if (dayNumber(hoje) < 1 || /^(localhost|127\.)/.test(location.hostname) || location.protocol === "file:") return;
   const ontem = dateKey(new Date(Date.now() - 86400000));
   const corpo = JSON.stringify({ e, d: dayNumber(hoje), r: ler("stats", {}).ultimo === ontem ? 1 : 0 });
   try { navigator.sendBeacon?.("api/evento.php", corpo) || fetch("api/evento.php", { method: "POST", body: corpo, keepalive: true }); } catch {}
@@ -98,31 +137,36 @@ function evento(e) {
 
 // Antes do lançamento o desafio do dia aparece como prévia (sem número e sem contador).
 const nomeDoDesafio = () => (dayNumber(hoje) >= 1 ? `Desafio nº ${dayNumber(hoje)}` : "Prévia");
+const chaveDia = (lv = nivel) => `dia:${hoje}:${lv}`;
 
 // ---------- montagem ----------
 function carregar() {
   trace = [];
+  sugestao = [];
   travado = false;
+  premio = null;
   if (modo === "diario") {
     hoje = dateKey();
-    puzzle = dailyPuzzle(hoje);
+    puzzle = dailyPuzzle(hoje, nivel);
     game = newGame(puzzle);
-    const salvo = ler(`dia:${hoje}`, null);
+    const salvo = ler(chaveDia(), null);
     if (salvo) {
       for (const cells of salvo.words) {
         const r = submit(puzzle, game, cells);
         if (r.ok) game = r.game;
       }
-      game = { ...game, hints: salvo.hints || 0 };
+      game = { ...game, hints: salvo.hints || 0, blocked: salvo.blocked || [] };
+      premio = salvo.premio || null;
     }
-    $("subtitulo").textContent = nomeDoDesafio();
+    $("subtitulo").textContent = `${nomeDoDesafio()} · ${LEVELS[nivel].nome}`;
   } else {
-    puzzle = makePuzzle(`treino:${Date.now()}:${Math.random()}`);
+    puzzle = makePuzzle(`treino:${Date.now()}:${Math.random()}`, nivel);
     game = newGame(puzzle);
-    $("subtitulo").textContent = "Treino livre";
+    $("subtitulo").textContent = `Treino livre · ${LEVELS[nivel].nome}`;
   }
   montarTabuleiro();
   desenhar();
+  (window.requestIdleCallback || setTimeout)(() => warmUp(puzzle));
   if (isWon(puzzle, game)) {
     travado = true;
     if (modo === "diario") setTimeout(() => mostrarVitoria(false), 500);
@@ -146,7 +190,10 @@ function montarTabuleiro() {
 
 function salvar() {
   if (modo !== "diario") return;
-  guardar(`dia:${hoje}`, { words: game.words.map((w) => w.cells), hints: game.hints, won: isWon(puzzle, game) });
+  guardar(chaveDia(), {
+    words: game.words.map((w) => w.cells), hints: game.hints, blocked: game.blocked || [],
+    won: isWon(puzzle, game), premio,
+  });
 }
 
 // ---------- desenho ----------
@@ -167,9 +214,26 @@ function centro(c) {
   return [(c % 5) * (lado + GAP) + lado / 2, Math.floor(c / 5) * (lado + GAP) + lado / 2];
 }
 
+function atualizarSaldo() {
+  $("saldo").textContent = carteira.moedas;
+  $("loja-saldo").textContent = carteira.moedas;
+  const st = ler("stats", STATS_VAZIO);
+  const ontem = dateKey(new Date(Date.now() - 86400000));
+  $("seq-topo").textContent = `🔥 ${st.ultimo === hoje || st.ultimo === ontem ? st.seq : 0}`;
+}
+
+function atualizarNiveis() {
+  document.querySelectorAll(".nivel").forEach((b) => {
+    const lv = b.dataset.nivel;
+    b.classList.toggle("ativo", lv === nivel);
+    b.querySelector("i").textContent = modo === "diario" && ler(`dia:${hoje}:${lv}`, {})?.won ? " ✓" : "";
+  });
+}
+
 function desenhar() {
   const cor = corDaCasa();
   const fim = trace.at(-1);
+  const bloqueadas = game.blocked || [];
   casas.forEach((b, i) => {
     b.className = "casa";
     b.style.background = "";
@@ -179,6 +243,8 @@ function desenhar() {
     if (i === game.head && !travado) b.classList.add("cabeca");
     if (trace.includes(i)) { b.classList.add("no-traco"); b.style.background = ""; }
     else if (trace.length && canExtend(game, trace, i)) b.classList.add("livre");
+    if (bloqueadas.includes(i)) b.classList.add("limpa");
+    if (sugestao.includes(i) && !travado) b.classList.add("sugerida");
     if (travado && !cor.has(i)) b.classList.add("apagada");
     b.setAttribute("aria-label", `${puzzle.grid[i]}${i === puzzle.start ? ", início" : ""}${i === puzzle.finish ? ", chegada" : ""}`);
   });
@@ -206,7 +272,7 @@ function desenhar() {
   $("estrelas-prev").textContent = "⭐".repeat(stars(puzzle, game)) || "—";
   $("btn-desfazer").disabled = travado || !game.words.length;
   $("btn-recomecar").disabled = travado || !game.words.length;
-  $("btn-dica").disabled = travado;
+  $("btn-dica").disabled = false;
 
   // trilha
   $("trilha").innerHTML = game.words
@@ -230,6 +296,8 @@ function desenhar() {
   } else {
     pv.textContent = `Continue de ${puzzle.grid[game.head]}…`;
   }
+  atualizarSaldo();
+  atualizarNiveis();
 }
 
 // ---------- entrada ----------
@@ -320,6 +388,7 @@ function confirmar() {
   game = r.game;
   const feitas = trace;
   trace = [];
+  sugestao = [];
   somAcerto();
   vibrar(20);
   desenhar();
@@ -332,23 +401,33 @@ function confirmar() {
 
 function vencer() {
   travado = true;
-  salvar();
+  const n = stars(puzzle, game);
   if (modo === "diario") {
-    const st = ler("stats", { jogos: 0, vitorias: 0, seq: 0, melhor: 0, estrelas: { 1: 0, 2: 0, 3: 0 } });
-    const ontem = dateKey(new Date(Date.now() - 86400000));
-    if (st.ultimo !== hoje) {
-      st.jogos += 1;
-      st.vitorias += 1;
-      st.seq = st.ultimo === ontem ? st.seq + 1 : 1;
-      st.melhor = Math.max(st.melhor, st.seq);
-      st.estrelas[stars(puzzle, game)] += 1;
-      st.ultimo = hoje;
-      guardar("stats", st);
-    }
+    let st = ler("stats", STATS_VAZIO);
+    const dia = registrarDia(st, carteira, hoje);
+    st = dia.stats;
+    carteira = dia.carteira;
+    if (dia.usouEscudo) setTimeout(() => aviso("🛡️ O escudo salvou sua sequência!", 3500), 1500);
+    st.jogos += 1;
+    st.vitorias += 1;
+    st.estrelas[n] += 1;
+    guardar("stats", st);
+    premio = { moedas: premioVitoria(nivel, n), dobrado: false };
+    carteira = ganhar(carteira, premio.moedas);
     evento("vitoria");
+  } else {
+    const c = usarCota(carteira, hoje, "treinosPremiados");
+    premio = c ? { moedas: TREINO_MOEDAS + n, dobrado: false } : null;
+    if (c) carteira = ganhar(c, premio.moedas);
+    treinosSeguidos += 1;
   }
+  salvar();
+  guardar("carteira", carteira);
   setTimeout(() => { desenhar(); somVitoria(); confete(); vibrar([40, 60, 40, 60, 80]); }, 350);
-  setTimeout(() => mostrarVitoria(true), 1300);
+  setTimeout(() => {
+    mostrarVitoria(true);
+    if (premio) moedasVoando($("vit-moedas"), premio.moedas);
+  }, 1300);
 }
 
 // ---------- vitória e compartilhamento ----------
@@ -356,7 +435,7 @@ function textoCompartilhar() {
   const n = stars(puzzle, game);
   const quadrados = game.words.map((_, i) => EMOJIS[i % EMOJIS.length]).join("");
   const dica = game.hints ? " 💡" : "";
-  return `Rota do Dia ${nomeDoDesafio().replace("Desafio ", "")} ${"⭐".repeat(n)}${dica}\n🟢${quadrados}🏁 ${game.words.length} palavras (meta ${puzzle.par})\n${location.origin}${location.pathname}`;
+  return `Rota do Dia ${nomeDoDesafio().replace("Desafio ", "")} · ${LEVELS[nivel].nome} ${"⭐".repeat(n)}${dica}\n🟢${quadrados}🏁 ${game.words.length} palavras (meta ${puzzle.par})\n${location.origin}${location.pathname}`;
 }
 
 let relogio;
@@ -366,12 +445,20 @@ function mostrarVitoria(comAnimacao) {
   $("vit-estrelas").innerHTML = [1, 2, 3]
     .map((i) => `<span class="${i <= n ? "" : "apagada"}" style="animation-delay:${comAnimacao ? i * 180 : 0}ms">⭐</span>`)
     .join("");
-  $("vit-resumo").textContent = `${game.words.length} palavras · meta ${puzzle.par}${game.hints ? " · com dica" : ""}`;
+  $("vit-resumo").textContent = `${game.words.length} palavras · meta ${puzzle.par}${game.hints ? " · com ajuda" : ""}`;
   $("vit-rota").innerHTML = $("trilha").innerHTML;
+  $("vit-premio").hidden = !premio;
+  if (premio) {
+    $("vit-moedas").textContent = premio.dobrado ? premio.moedas * 2 : premio.moedas;
+    $("btn-dobrar").hidden = !anunciosAtivos() || premio.dobrado;
+    $("btn-dobrar").textContent = `▶ Dobrar com vídeo (+${premio.moedas})`;
+  }
   const diario = modo === "diario";
   $("btn-compartilhar").hidden = !diario;
   $("vit-proximo").hidden = !diario;
-  $("btn-treinar").textContent = diario ? "Treinar mais" : "Novo treino";
+  const proximoNivel = Object.keys(LEVELS).find((lv) => !ler(`dia:${hoje}:${lv}`, {})?.won);
+  $("btn-treinar").textContent = !diario ? "Novo treino" : proximoNivel ? `Jogar ${LEVELS[proximoNivel].nome}` : "Treinar mais";
+  $("btn-treinar").dataset.nivel = diario ? proximoNivel || "" : "";
   clearInterval(relogio);
   if (diario) {
     const tick = () => {
@@ -387,6 +474,22 @@ function mostrarVitoria(comAnimacao) {
   if (!$("dlg-vitoria").open) $("dlg-vitoria").showModal();
 }
 
+$("btn-dobrar").addEventListener("click", async () => {
+  if (!premio || premio.dobrado) return;
+  $("btn-dobrar").disabled = true;
+  const r = await videoPremiado("dobrar-vitoria");
+  $("btn-dobrar").disabled = false;
+  if (!r.ok) return aviso(r.motivo === "fechou" ? "Vídeo fechado antes do fim: sem bônus" : "Nenhum vídeo disponível agora");
+  evento("video");
+  carteira = ganhar(carteira, premio.moedas);
+  premio = { ...premio, dobrado: true };
+  salvar();
+  guardar("carteira", carteira);
+  $("vit-moedas").textContent = premio.moedas * 2;
+  $("btn-dobrar").hidden = true;
+  moedasVoando($("vit-moedas"), premio.moedas);
+});
+
 $("btn-compartilhar").addEventListener("click", async () => {
   const texto = textoCompartilhar();
   evento("compartilhar");
@@ -397,32 +500,195 @@ $("btn-compartilhar").addEventListener("click", async () => {
   catch { aviso("Não deu para copiar neste navegador"); }
 });
 
-$("btn-treinar").addEventListener("click", () => {
+$("btn-treinar").addEventListener("click", async () => {
   $("dlg-vitoria").close();
+  const proximo = $("btn-treinar").dataset.nivel;
+  if (proximo) return trocarNivel(proximo);
+  // anúncio de tela cheia a cada 3 treinos vencidos (o Google ainda controla a frequência)
+  if (modo === "treino" && treinosSeguidos >= 3) { treinosSeguidos = 0; await intersticial("entre-treinos"); }
   trocarModo("treino");
 });
 
-// ---------- botões ----------
-$("btn-ok").addEventListener("click", () => trace.length >= 2 && confirmar());
-$("btn-limpar").addEventListener("click", () => { trace = []; desenhar(); });
-$("btn-desfazer").addEventListener("click", () => { trace = []; game = undo(puzzle, game); salvar(); tom(330, 0.1); desenhar(); });
-$("btn-recomecar").addEventListener("click", () => {
-  trace = [];
-  game = { ...newGame(puzzle), hints: game.hints };
-  salvar();
-  tom(260, 0.15);
-  desenhar();
-});
-$("btn-dica").addEventListener("click", () => {
+// ---------- ajudas e loja ----------
+function pagar(preco) {
+  const c = gastar(carteira, preco);
+  if (!c) {
+    aviso(anunciosAtivos() ? "Moedas insuficientes: assista um vídeo para ganhar mais" : "Moedas insuficientes");
+    return false;
+  }
+  carteira = c;
+  salvarCarteira();
+  return true;
+}
+
+function ajudaProxima() {
+  const sol = solve(puzzle, game);
+  if (!sol) { aviso("Daqui não tem saída: desfaça a última palavra (grátis)", 3500); return false; }
+  sugestao = sol[0];
   game = { ...game, hints: game.hints + 1 };
-  salvar();
+  sol[0].forEach((c, i) => setTimeout(() => { casas[c].classList.add("dica"); somPasso(i); setTimeout(() => casas[c].classList.remove("dica"), 1250); }, i * 160));
+  aviso(`Siga as casas douradas: ${sol[0].map((c) => puzzle.grid[c]).join("·")}`, 3500);
+  return true;
+}
+
+function ajudaApagar() {
+  const livres = uselessCells(puzzle, game, solve(puzzle, game)).filter((c) => c !== game.head);
+  if (!livres.length) { aviso("Não sobrou casa inútil para apagar"); return false; }
+  const escolhidas = livres.sort(() => Math.random() - 0.5).slice(0, 5);
+  game = { ...game, blocked: [...(game.blocked || []), ...escolhidas] };
+  aviso(`${escolhidas.length} casas apagadas`);
+  return true;
+}
+
+function ajudaRota() {
+  game = { ...game, hints: game.hints + 1 };
   const cells = [...new Set(puzzle.route.flatMap((r) => r.cells))];
   cells.forEach((c, i) => setTimeout(() => {
     casas[c].classList.add("dica");
     somPasso(i);
     setTimeout(() => casas[c].classList.remove("dica"), 1250);
   }, i * 140));
-  aviso("Essa é a rota oficial. Com dica, no máximo ⭐⭐", 3200);
+  aviso("Essa é a rota oficial", 3200);
+  return true;
+}
+
+const AJUDAS = { proxima: ajudaProxima, apagar: ajudaApagar, rota: ajudaRota };
+
+function usarAjuda(tipo, gratis = false) {
+  if (tipo === "escudo") {
+    if (!pagar(PRECOS.escudo)) return;
+    carteira = { ...carteira, escudos: carteira.escudos + 1 };
+    salvarCarteira();
+    aviso("🛡️ Escudo guardado");
+    return abrirLoja();
+  }
+  if (travado) return aviso("Partida já vencida: a ajuda fica para a próxima");
+  if (tipo === "proxima" && !solve(puzzle, game)) return aviso("Daqui não tem saída: desfaça a última palavra (grátis)", 3500);
+  if (!gratis && !pagar(PRECOS[tipo])) return;
+  $("dlg-loja").close();
+  trace = [];
+  AJUDAS[tipo]();
+  salvar();
+  desenhar();
+}
+
+function abrirLoja() {
+  atualizarSaldo();
+  const hojeKey = dateKey();
+  document.querySelectorAll("[data-ajuda]").forEach((b) => {
+    b.disabled = carteira.moedas < PRECOS[b.dataset.ajuda] || (b.dataset.ajuda !== "escudo" && travado);
+  });
+  const videos = anunciosAtivos();
+  document.querySelectorAll("[data-video-ajuda]").forEach((b) => {
+    b.hidden = !videos;
+    b.disabled = travado || restante(carteira, hojeKey, "videoAjuda") <= 0;
+    b.textContent = `▶ grátis (${restante(carteira, hojeKey, "videoAjuda")})`;
+  });
+  $("item-video-moedas").hidden = !videos;
+  $("videos-restantes").textContent = restante(carteira, hojeKey, "videoMoedas");
+  $("btn-video-moedas").disabled = restante(carteira, hojeKey, "videoMoedas") <= 0;
+  $("escudos").textContent = carteira.escudos;
+  $("temas").innerHTML = Object.entries(TEMAS).map(([id, t]) => {
+    const tem = carteira.temas.includes(id);
+    return `<button class="tema ${carteira.tema === id ? "ativo" : ""}" data-tema="${id}">
+      <span class="amostra" data-tema-amostra="${id}"><i></i><i></i><i></i></span>
+      ${t.nome}<small>${carteira.tema === id ? "Em uso" : tem ? "Usar" : `🪙 ${t.preco}`}</small></button>`;
+  }).join("");
+  pintarAmostras();
+  if (!$("dlg-loja").open) $("dlg-loja").showModal();
+}
+
+const AMOSTRAS = {
+  neon: ["#263066", "#3cff9b", "#ff6ad5"], oceano: ["#0a466e", "#4dd7ff", "#7cf2d0"],
+  pordosol: ["#6e1e46", "#ff8a3d", "#ffcc33"], ouro: ["#46340a", "#ffcc33", "#fff1b8"],
+};
+function pintarAmostras() {
+  document.querySelectorAll("[data-tema-amostra]").forEach((s) => {
+    s.querySelectorAll("i").forEach((i, k) => (i.style.background = AMOSTRAS[s.dataset.temaAmostra][k]));
+  });
+}
+
+function aplicarTema() { document.body.dataset.tema = carteira.tema; }
+
+$("btn-dica").addEventListener("click", abrirLoja);
+$("btn-moedas").addEventListener("click", abrirLoja);
+document.querySelectorAll("[data-ajuda]").forEach((b) => b.addEventListener("click", () => usarAjuda(b.dataset.ajuda)));
+document.querySelectorAll("[data-video-ajuda]").forEach((b) => b.addEventListener("click", async () => {
+  const tipo = b.dataset.videoAjuda;
+  if (tipo === "proxima" && !solve(puzzle, game)) return aviso("Daqui não tem saída: desfaça a última palavra (grátis)", 3500);
+  const c = usarCota(carteira, dateKey(), "videoAjuda");
+  if (!c) return aviso("Vídeos de ajuda de hoje acabaram");
+  const r = await videoPremiado(`ajuda-${tipo}`);
+  if (!r.ok) return aviso(r.motivo === "fechou" ? "Vídeo fechado antes do fim" : "Nenhum vídeo disponível agora");
+  evento("video");
+  carteira = c;
+  salvarCarteira();
+  usarAjuda(tipo, true);
+}));
+$("btn-video-moedas").addEventListener("click", async () => {
+  const c = usarCota(carteira, dateKey(), "videoMoedas");
+  if (!c) return aviso("Vídeos de hoje acabaram. Volte amanhã!");
+  const r = await videoPremiado("moedas-gratis");
+  if (!r.ok) return aviso(r.motivo === "fechou" ? "Vídeo fechado antes do fim" : "Nenhum vídeo disponível agora");
+  evento("video");
+  carteira = ganhar(c, VIDEO_MOEDAS);
+  guardar("carteira", carteira);
+  moedasVoando($("btn-video-moedas"), VIDEO_MOEDAS);
+  setTimeout(abrirLoja, 900);
+});
+$("temas").addEventListener("click", (e) => {
+  const b = e.target.closest("[data-tema]");
+  if (!b) return;
+  const c = comprarTema(carteira, b.dataset.tema);
+  if (!c) return aviso("Moedas insuficientes para esse tema");
+  carteira = c;
+  salvarCarteira();
+  aplicarTema();
+  somMoeda();
+  abrirLoja();
+});
+
+// ---------- bônus diário ----------
+let bonusAtual = null;
+function verificarBonus() {
+  const r = bonusDiario(carteira, dateKey());
+  if (!r) return;
+  carteira = r.carteira;
+  guardar("carteira", carteira);
+  bonusAtual = { valor: r.valor, dobrado: false };
+  $("bonus-dia").textContent = `Dia ${r.dia} seguido`;
+  $("bonus-valor").textContent = r.valor;
+  $("bonus-trilha").innerHTML = BONUS_DIARIO.map((v, i) => `<span class="${i < Math.min(r.dia, 7) ? "feito" : ""}">${v}</span>`).join("");
+  $("btn-bonus-dobrar").hidden = !anunciosAtivos();
+  $("dlg-bonus").showModal();
+}
+$("dlg-bonus").addEventListener("close", () => {
+  if (bonusAtual) moedasVoando($("bonus-valor"), bonusAtual.dobrado ? bonusAtual.valor * 2 : bonusAtual.valor);
+  bonusAtual = null;
+});
+$("btn-bonus-dobrar").addEventListener("click", async () => {
+  if (!bonusAtual || bonusAtual.dobrado) return;
+  const r = await videoPremiado("dobrar-bonus");
+  if (!r.ok) return aviso(r.motivo === "fechou" ? "Vídeo fechado antes do fim" : "Nenhum vídeo disponível agora");
+  evento("video");
+  carteira = ganhar(carteira, bonusAtual.valor);
+  guardar("carteira", carteira);
+  bonusAtual.dobrado = true;
+  $("bonus-valor").textContent = bonusAtual.valor * 2;
+  $("btn-bonus-dobrar").hidden = true;
+  somMoeda();
+});
+
+// ---------- botões ----------
+$("btn-ok").addEventListener("click", () => trace.length >= 2 && confirmar());
+$("btn-limpar").addEventListener("click", () => { trace = []; desenhar(); });
+$("btn-desfazer").addEventListener("click", () => { trace = []; sugestao = []; game = undo(puzzle, game); salvar(); tom(330, 0.1); desenhar(); });
+$("btn-recomecar").addEventListener("click", () => {
+  trace = [];
+  sugestao = [];
+  game = { ...newGame(puzzle), hints: game.hints, blocked: game.blocked || [] };
+  salvar();
+  tom(260, 0.15);
   desenhar();
 });
 
@@ -431,9 +697,15 @@ function trocarModo(novo) {
   document.querySelectorAll(".modo").forEach((b) => b.classList.toggle("ativo", b.dataset.modo === modo));
   carregar();
 }
+function trocarNivel(novo) {
+  nivel = novo;
+  guardar("nivel", nivel);
+  carregar();
+}
 document.querySelectorAll(".modo").forEach((b) => b.addEventListener("click", () => {
   if (b.dataset.modo !== modo || modo === "treino") trocarModo(b.dataset.modo);
 }));
+document.querySelectorAll(".nivel").forEach((b) => b.addEventListener("click", () => trocarNivel(b.dataset.nivel)));
 
 function atualizarSom() {
   $("btn-som").textContent = somLigado ? "🔊" : "🔇";
@@ -443,7 +715,7 @@ $("btn-som").addEventListener("click", () => { somLigado = !somLigado; guardar("
 
 $("btn-ajuda").addEventListener("click", () => $("dlg-ajuda").showModal());
 $("btn-stats").addEventListener("click", () => {
-  const st = ler("stats", { jogos: 0, vitorias: 0, seq: 0, melhor: 0, estrelas: { 1: 0, 2: 0, 3: 0 } });
+  const st = ler("stats", STATS_VAZIO);
   const ontem = dateKey(new Date(Date.now() - 86400000));
   const seqAtual = st.ultimo === hoje || st.ultimo === ontem ? st.seq : 0;
   $("st-jogos").textContent = st.jogos;
@@ -461,15 +733,23 @@ document.querySelectorAll("dialog").forEach((d) => d.addEventListener("click", (
 
 window.addEventListener("resize", desenhar);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && modo === "diario" && dateKey() !== hoje) carregar();
+  if (!document.hidden && dateKey() !== hoje) { if (modo === "diario") carregar(); verificarBonus(); }
 });
 
 // ---------- início ----------
+iniciarAnuncios({ pausar: () => { mudoPorAnuncio = true; }, retomar: () => { mudoPorAnuncio = false; } });
+aplicarTema();
 atualizarSom();
 carregar();
 fetch("palavras-validas.txt")
   .then((r) => (r.ok ? r.text() : Promise.reject(r.status)))
-  .then((t) => { loadExtra(t); if (trace.length) desenhar(); })
+  .then((t) => { loadExtra(t); if (trace.length) desenhar(); (window.requestIdleCallback || setTimeout)(() => warmUp(puzzle)); })
   .catch(() => aviso("Dicionário completo não carregou; valendo a lista básica", 3500));
-if (!ler("visto", false)) { guardar("visto", true); setTimeout(() => $("dlg-ajuda").showModal(), 600); }
+if (!ler("visto", false)) {
+  guardar("visto", true);
+  setTimeout(() => $("dlg-ajuda").showModal(), 600);
+  $("dlg-ajuda").addEventListener("close", verificarBonus, { once: true });
+} else {
+  setTimeout(verificarBonus, 700);
+}
 if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});

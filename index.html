@@ -22,7 +22,7 @@
       <button class="icone" id="btn-ajuda" aria-label="Como jogar">?</button>
       <div class="marca">
         <h1>ROTA <em>do</em> DIA</h1>
-        <p id="subtitulo">Desafio nº 1</p>
+        <p id="subtitulo">Carregando…</p>
       </div>
       <div class="acoes-topo">
         <button class="icone" id="btn-som" aria-label="Som ligado">🔊</button>
@@ -30,9 +30,20 @@
       </div>
     </header>
 
+    <div class="barra-topo">
+      <button class="moedas" id="btn-moedas" aria-label="Moedas e loja"><span class="moeda">🪙</span> <b id="saldo">0</b> <span class="mais">+</span></button>
+      <span class="seq" id="seq-topo" title="Dias seguidos">🔥 0</span>
+    </div>
+
     <nav class="modos" aria-label="Modo de jogo">
       <button class="modo ativo" data-modo="diario">Desafio do dia</button>
       <button class="modo" data-modo="treino">Treino livre</button>
+    </nav>
+
+    <nav class="niveis" aria-label="Dificuldade">
+      <button class="nivel" data-nivel="facil">Fácil <i></i></button>
+      <button class="nivel ativo" data-nivel="medio">Médio <i></i></button>
+      <button class="nivel" data-nivel="dificil">Difícil <i></i></button>
     </nav>
 
     <section class="painel">
@@ -58,7 +69,7 @@
 
     <section class="controles">
       <button id="btn-desfazer" class="ctrl">↩ Desfazer</button>
-      <button id="btn-dica" class="ctrl">💡 Dica</button>
+      <button id="btn-dica" class="ctrl destaque">💡 Ajudas</button>
       <button id="btn-recomecar" class="ctrl">⟲ Recomeçar</button>
     </section>
 
@@ -76,6 +87,7 @@
       <li><span class="ex inicio">CO</span> Comece no <b>INÍCIO</b> e arraste por casas vizinhas (até na diagonal) para formar uma palavra: <b>CO·RU·JA</b>.</li>
       <li><span class="ex">JA</span> A próxima palavra começa na <b>última sílaba</b> da anterior: <b>JA·CA</b>, depois <b>CA·NE·TA</b>…</li>
       <li><span class="ex fim">🏁</span> Chegue à <b>CHEGADA</b>. Casa usada não volta. Usou as palavras da meta ou menos? <b>3 estrelas.</b></li>
+      <li><span class="ex">🪙</span> Cada vitória dá <b>moedas</b>. Troque por ajudas quando travar. Fácil, Médio e Difícil: <b>3 desafios por dia</b>.</li>
     </ol>
     <p class="nota">No celular dá para tocar casa por casa e confirmar no ✓. Um desafio novo sai todo dia à meia-noite.</p>
     <button class="grande" data-fechar>Bora jogar</button>
@@ -86,6 +98,10 @@
     <div class="estrelas-grandes" id="vit-estrelas"></div>
     <p class="vit-resumo" id="vit-resumo"></p>
     <div class="vit-rota" id="vit-rota"></div>
+    <div class="premio" id="vit-premio" hidden>
+      <span class="premio-valor">+<b id="vit-moedas">0</b> 🪙</span>
+      <button class="video" id="btn-dobrar">▶ Dobrar com vídeo</button>
+    </div>
     <button class="grande" id="btn-compartilhar">Compartilhar resultado</button>
     <div class="proximo" id="vit-proximo">Próximo desafio em <b id="contador">--:--:--</b></div>
     <div class="linha-botoes">
@@ -106,6 +122,72 @@
     <div class="barras" id="st-barras"></div>
     <p class="nota">Ficam só neste aparelho.</p>
     <button class="grande" data-fechar>Fechar</button>
+  </dialog>
+
+  <dialog id="dlg-loja" class="dlg loja">
+    <div class="loja-topo">
+      <h2>Ajudas e loja</h2>
+      <span class="moedas fixo">🪙 <b id="loja-saldo">0</b></span>
+    </div>
+
+    <h3>Para esta partida</h3>
+    <div class="itens">
+      <div class="item">
+        <span class="item-icone">🧭</span>
+        <div><b>Próxima palavra</b><small>Acende uma palavra que leva até a chegada. Máx. ⭐⭐</small></div>
+        <div class="item-botoes">
+          <button class="comprar" data-ajuda="proxima">🪙 30</button>
+          <button class="video mini-video" data-video-ajuda="proxima">▶ grátis</button>
+        </div>
+      </div>
+      <div class="item">
+        <span class="item-icone">🧹</span>
+        <div><b>Limpar o tabuleiro</b><small>Apaga 5 casas que não servem para nada. Não perde estrela.</small></div>
+        <div class="item-botoes"><button class="comprar" data-ajuda="apagar">🪙 20</button></div>
+      </div>
+      <div class="item">
+        <span class="item-icone">🗺️</span>
+        <div><b>Rota oficial</b><small>Mostra o caminho inteiro do desafio. Máx. ⭐⭐</small></div>
+        <div class="item-botoes"><button class="comprar" data-ajuda="rota">🪙 60</button></div>
+      </div>
+    </div>
+
+    <h3>Ganhe moedas</h3>
+    <div class="itens">
+      <div class="item" id="item-video-moedas">
+        <span class="item-icone">🎬</span>
+        <div><b>Assistir um vídeo</b><small>+25 moedas · <span id="videos-restantes">5</span> hoje</small></div>
+        <div class="item-botoes"><button class="video" id="btn-video-moedas">▶ +25</button></div>
+      </div>
+      <div class="item">
+        <span class="item-icone">📅</span>
+        <div><b>Bônus diário</b><small>Abra o jogo todo dia: 10, 15, 20… até 60 moedas</small></div>
+      </div>
+    </div>
+
+    <h3>Proteção</h3>
+    <div class="itens">
+      <div class="item">
+        <span class="item-icone">🛡️</span>
+        <div><b>Escudo de sequência</b><small>Salva seus dias seguidos se faltar um dia. Você tem <span id="escudos">0</span>.</small></div>
+        <div class="item-botoes"><button class="comprar" data-ajuda="escudo">🪙 120</button></div>
+      </div>
+    </div>
+
+    <h3>Temas do tabuleiro</h3>
+    <div class="temas" id="temas"></div>
+
+    <p class="nota">Moedas valem só dentro do jogo: não se compram nem se trocam por dinheiro.</p>
+    <button class="grande" data-fechar>Voltar ao jogo</button>
+  </dialog>
+
+  <dialog id="dlg-bonus" class="dlg vitoria">
+    <p class="selo">Bônus diário</p>
+    <p class="bonus-dia" id="bonus-dia">Dia 1</p>
+    <div class="bonus-valor">+<b id="bonus-valor">10</b> 🪙</div>
+    <div class="bonus-trilha" id="bonus-trilha"></div>
+    <button class="video grande-video" id="btn-bonus-dobrar">▶ Dobrar com vídeo</button>
+    <button class="grande" data-fechar>Pegar</button>
   </dialog>
 
   <script type="module" src="jogo.js"></script>

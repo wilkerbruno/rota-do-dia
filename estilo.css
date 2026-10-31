@@ -186,6 +186,90 @@ button { font: inherit; color: inherit; cursor: pointer; border: 0; background: 
 .barra { display: grid; grid-template-columns: 52px 1fr; gap: 8px; align-items: center; font-size: 13px; }
 .barra i { display: block; height: 22px; min-width: 22px; border-radius: 8px; background: linear-gradient(90deg, #3cff9b, #4dd7ff); color: #04110f; font-style: normal; font-weight: 900; text-align: right; padding: 2px 8px; }
 
+/* moedas e sequência */
+.barra-topo { display: flex; justify-content: space-between; align-items: center; margin-top: -4px; }
+.moedas {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-radius: 999px;
+  background: linear-gradient(90deg, #3a2a00, #5a4100); border: 1px solid #ffcc3388; font-weight: 900; font-size: 16px;
+  box-shadow: 0 0 16px #ffcc3333;
+}
+.moedas b { color: #ffe27a; font-variant-numeric: tabular-nums; min-width: 2ch; }
+.moedas .mais { width: 22px; height: 22px; border-radius: 50%; background: #ffcc33; color: #2a1d00; display: grid; place-items: center; font-size: 15px; }
+.moedas.fixo { padding: 6px 12px; }
+.moedas.pula { animation: pula .6s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes pula { 40% { transform: scale(1.25); box-shadow: 0 0 30px #ffcc33aa; } }
+.seq { font-weight: 900; color: #ffb547; font-size: 15px; }
+.moeda-voa { position: fixed; z-index: 50; font-size: 26px; pointer-events: none; transition: transform .8s cubic-bezier(.5, -0.3, .7, 1), opacity .8s; }
+
+/* níveis */
+.niveis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.nivel { padding: 7px 0; border-radius: 12px; font-weight: 800; font-size: 13px; color: var(--suave); background: #ffffff0d; border: 1px solid transparent; }
+.nivel.ativo { color: var(--texto); border-color: #ffffff55; background: #ffffff1a; }
+.nivel[data-nivel="facil"].ativo { border-color: var(--inicio); }
+.nivel[data-nivel="dificil"].ativo { border-color: #ff5c7a; }
+.nivel i { font-style: normal; color: var(--inicio); }
+
+.ctrl.destaque { background: linear-gradient(180deg, #4a3a00, #2c2200); border-color: #ffcc3388; }
+
+/* casas apagadas pela ajuda e sugestão */
+.casa.limpa { opacity: .12; transform: scale(.85); }
+.casa.sugerida { box-shadow: 0 0 0 3px var(--fim), 0 0 24px #ffcc33aa; }
+
+/* prêmio na vitória */
+.premio { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 14px; }
+.premio-valor { font-size: 28px; font-weight: 900; color: #ffe27a; text-shadow: 0 0 18px #ffcc3388; }
+.video {
+  padding: 10px 14px; border-radius: 14px; font-weight: 900; color: #1a0b00;
+  background: linear-gradient(90deg, #ffcc33, #ff8a3d); box-shadow: 0 6px 20px #ff8a3d55; animation: chama 1.8s ease-in-out infinite;
+}
+.video:disabled { animation: none; filter: grayscale(1); opacity: .5; }
+@keyframes chama { 50% { transform: scale(1.04); box-shadow: 0 6px 28px #ff8a3d99; } }
+.grande-video { width: 100%; margin-top: 14px; padding: 14px; font-size: 17px; }
+
+/* loja */
+.loja { max-height: 88dvh; overflow-y: auto; }
+.loja-topo { display: flex; justify-content: space-between; align-items: center; }
+.loja-topo h2 { margin: 0; }
+.itens { display: grid; gap: 8px; }
+.item { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; background: #ffffff0d; border-radius: 14px; padding: 10px; }
+.item-icone { font-size: 24px; text-align: center; }
+.item b { display: block; font-size: 15px; }
+.item small { color: var(--suave); font-size: 12px; line-height: 1.3; display: block; }
+.item-botoes { display: grid; gap: 6px; }
+.comprar { padding: 8px 12px; border-radius: 12px; font-weight: 900; background: #ffcc3322; border: 1px solid #ffcc3388; color: #ffe27a; white-space: nowrap; }
+.comprar:disabled { opacity: .4; }
+.mini-video { padding: 6px 10px; font-size: 12px; }
+.temas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.tema { padding: 10px; border-radius: 14px; border: 2px solid transparent; text-align: left; font-weight: 800; background: #ffffff0d; }
+.tema.ativo { border-color: var(--inicio); }
+.tema .amostra { display: flex; gap: 4px; margin-bottom: 6px; }
+.tema .amostra i { width: 18px; height: 18px; border-radius: 5px; }
+.tema small { display: block; color: var(--suave); font-weight: 700; }
+
+/* bônus */
+.bonus-dia { margin: 4px 0 0; color: var(--suave); font-weight: 800; }
+.bonus-valor { font-size: 52px; font-weight: 900; color: #ffe27a; text-shadow: 0 0 24px #ffcc3388; animation: estrela .6s cubic-bezier(.2, 1.6, .4, 1); }
+.bonus-trilha { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+.bonus-trilha span { padding: 6px 0; border-radius: 8px; background: #ffffff10; font-size: 11px; font-weight: 800; color: var(--suave); }
+.bonus-trilha span.feito { background: #ffcc33; color: #2a1d00; }
+
+/* anúncio simulado */
+.anuncio-teste { position: fixed; inset: 0; z-index: 60; background: #000d; display: grid; place-items: center; padding: 16px; }
+.anuncio-caixa { width: min(360px, 100%); background: #11131f; border: 1px dashed #ffcc33; border-radius: 20px; padding: 22px; text-align: center; }
+.anuncio-tag { margin: 0; color: #ffcc33; font-weight: 900; letter-spacing: .12em; font-size: 12px; }
+.anuncio-titulo { font-size: 22px; font-weight: 900; margin: 8px 0; }
+.anuncio-nota { color: var(--suave); font-size: 13px; }
+.anuncio-barra { height: 8px; border-radius: 8px; background: #ffffff1a; overflow: hidden; margin: 16px 0; }
+.anuncio-barra i { display: block; height: 100%; width: 0; background: #ffcc33; transition: width 1s linear; }
+.anuncio-fechar { padding: 10px 18px; border-radius: 12px; background: #ffffff1a; font-weight: 800; }
+.anuncio-fechar.pronto { background: var(--inicio); color: #04110f; }
+
+/* temas comprados */
+body[data-tema="oceano"] { --tile: rgba(10, 70, 110, .75); --tile-borda: rgba(120, 220, 255, .3); background: radial-gradient(120% 80% at 50% 0%, #0a4f7a 0%, #04223a 55%, #010a14 100%); }
+body[data-tema="pordosol"] { --tile: rgba(110, 30, 70, .72); --tile-borda: rgba(255, 160, 120, .3); background: radial-gradient(120% 80% at 50% 0%, #a83a3a 0%, #3a0f2e 55%, #12030c 100%); }
+body[data-tema="ouro"] { --tile: rgba(70, 52, 10, .8); --tile-borda: rgba(255, 210, 90, .45); background: radial-gradient(120% 80% at 50% 0%, #6b5210 0%, #2a1f05 55%, #0c0802 100%); }
+body[data-tema="ouro"] .casa { color: #ffe9a8; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition: none !important; }
 }
