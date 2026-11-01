@@ -4,3 +4,5 @@ Disallow: /api/
 
 User-agent: Mediapartners-Google
 Allow: /
+
+Sitemap: https://trevoapostas.com/sitemap.xml
