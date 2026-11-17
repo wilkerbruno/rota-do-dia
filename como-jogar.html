@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Como jogar — Rota do Dia</title>
+  <meta name="description" content="Regras completas do Rota do Dia, o jogo diário de palavras por sílabas: como traçar a rota, ganhar estrelas, usar ajudas e moedas.">
+  <link rel="canonical" href="https://trevoapostas.com/como-jogar.html">
+  <link rel="stylesheet" href="estilo.css">
+  <style>
+    .texto { max-width: 640px; margin: 0 auto; padding: 24px 16px 48px; line-height: 1.65; }
+    .texto h1 { font-size: 28px; line-height: 1.2; } .texto h2 { font-size: 19px; margin-top: 30px; }
+    .texto a { color: #4dd7ff; } .texto p, .texto li { color: #d7dcff; }
+    .texto ul, .texto ol { padding-left: 22px; }
+    .ex { background: rgba(38,48,102,.72); border: 1px solid rgba(140,160,255,.22); border-radius: 12px; padding: 10px 14px; margin: 12px 0; color: #f3f5ff; }
+    .cards { list-style: none; padding: 0; display: grid; gap: 12px; }
+    .cards li { background: rgba(38,48,102,.72); border: 1px solid rgba(140,160,255,.22); border-radius: 14px; padding: 14px; }
+    .cards a { font-weight: 700; font-size: 17px; }
+    .rodape-site { margin-top: 40px; padding-top: 16px; border-top: 1px solid rgba(140,160,255,.22); text-align: center; font-size: 13px; color: #a9b2e6; }
+    .rodape-site a { color: #a9b2e6; }
+  </style>
+</head>
+<body>
+  <main class="texto">
+    <p><a href="./">← Voltar ao jogo</a></p>
+    <h1>Como jogar Rota do Dia</h1>
+    <p>Rota do Dia é um jogo de palavras em que você não digita letras: você <b>traça um caminho por sílabas</b>. Esta página explica cada regra com exemplos, para você entender o jogo em poucos minutos.</p>
+
+    <h2>O tabuleiro</h2>
+    <p>O tabuleiro é uma grade de casas, e cada casa guarda uma sílaba, como CO, RU, JA ou CA. Em um canto fica a casa <b>INÍCIO</b>. Em outro fica a casa <b>CHEGADA</b>. O seu objetivo é sair de uma e alcançar a outra, formando palavras pelo caminho.</p>
+
+    <h2>Formando uma palavra</h2>
+    <p>Toque ou arraste a partir do INÍCIO e passe por casas vizinhas. Vale andar na horizontal, na vertical e também na <b>diagonal</b>. As sílabas que você atravessa, lidas em sequência, formam a palavra.</p>
+    <div class="ex">Exemplo: CO · RU · JA forma <b>CORUJA</b>.</div>
+    <p>Ao terminar o traço, confirme a palavra. Se ela existir no dicionário do jogo, a rota avança. Se não existir, nada se perde: é só limpar o traço e tentar outro caminho.</p>
+
+    <h2>A regra da corrente</h2>
+    <p>Aqui está a ideia central. Cada palavra nova precisa começar pela <b>última sílaba da palavra anterior</b>. A sílaba final de uma palavra vira a sílaba inicial da próxima, como elos de uma corrente.</p>
+    <div class="ex">CO · RU · <b>JA</b><br><b>JA</b> · CA<br><b>CA</b> · NE · TA</div>
+    <p>Repare que JA aparece nas duas primeiras palavras, mas na grade ela é uma casa só: a última sílaba de uma palavra é o ponto de partida da seguinte. Por isso, pensar em palavras que terminam bem faz toda a diferença.</p>
+
+    <h2>Casas usadas não voltam</h2>
+    <p>Depois de passar por uma casa, ela fica marcada e não pode ser reutilizada. Isso obriga você a planejar. Um caminho curto pode parecer ótimo e, mesmo assim, deixar a CHEGADA isolada, sem vizinhas livres. Antes de confirmar uma palavra, olhe para onde a rota vai continuar.</p>
+
+    <h2>Chegando à CHEGADA</h2>
+    <p>O desafio termina quando a sua rota alcança a casa CHEGADA, completando a última palavra. Pode haver mais de um caminho possível. O jogo aceita qualquer rota válida, não apenas uma solução fixa.</p>
+
+    <h2>Como funcionam as estrelas</h2>
+    <p>Cada desafio mostra uma <b>meta de palavras</b>. As estrelas medem a sua eficiência:</p>
+    <ul>
+      <li><b>3 estrelas</b>: você chegou usando o número de palavras da meta ou menos.</li>
+      <li><b>Menos estrelas</b>: você chegou, mas precisou de mais palavras que a meta.</li>
+    </ul>
+    <p>Palavras longas, com três ou quatro sílabas, atravessam mais casas de uma vez, e isso ajuda a ficar dentro da meta. Veja mais ideias no artigo <a href="dicas/estrategia-tres-estrelas.html">Estratégia para três estrelas</a>.</p>
+
+    <h2>Jornada, Desafio do dia e Treino</h2>
+    <p>O jogo tem três jeitos de jogar:</p>
+    <ul>
+      <li><b>Jornada</b>: uma sequência de fases no mapa, uma depois da outra. Algumas casas têm pedras que bloqueiam o caminho, e cada fase vencida libera a próxima. Na Jornada você tem vidas: quando acabam, é só esperar elas voltarem.</li>
+      <li><b>Desafio do dia</b>: são três desafios por dia, um em cada nível (Fácil, Médio e Difícil). Eles mudam todo dia e alimentam o seu histórico, a sua sequência e as suas estatísticas.</li>
+      <li><b>Treino</b>: serve para praticar sem pressa e experimentar caminhos diferentes, sem mexer no desafio do dia.</li>
+    </ul>
+    <p>Se você está começando, o Treino é um bom lugar para se acostumar com as sílabas. Depois, o Desafio do dia vira um hábito curto e agradável.</p>
+
+    <h2>Ajudas e moedas</h2>
+    <p>Quando travar, o botão <b>Ajudas</b> oferece um empurrãozinho para continuar a rota. Cada ajuda custa moedas.</p>
+    <p>As <b>moedas</b> são uma pontuação interna do jogo. Você ganha moedas ao vencer desafios e pode trocá-las por ajudas. Elas existem apenas dentro do jogo e <b>não têm valor em dinheiro</b>: não podem ser trocadas por dinheiro, sacadas nem transferidas. O jogo também permite comprar moedas, o que é totalmente opcional; os detalhes estão nos <a href="termos.html">termos</a>.</p>
+
+    <h2>Desfazer e recomeçar</h2>
+    <p>O botão <b>Desfazer</b> volta uma palavra, liberando as casas dela. O botão <b>Recomeçar</b> limpa toda a rota e deixa você tentar de novo desde o INÍCIO. Use sem receio: errar faz parte de aprender o tabuleiro.</p>
+
+    <h2>Virada à meia-noite</h2>
+    <p>Todo dia, à meia-noite, os três desafios do dia são renovados. O prazer está em voltar amanhã e encarar o novo tabuleiro.</p>
+
+    <h2>No celular</h2>
+    <p>Na tela de toque, você pode arrastar o dedo pelas casas ou tocar casa por casa e confirmar no botão ✓. Escolha o jeito mais confortável para você.</p>
+
+    <h2>Pronto para começar?</h2>
+    <p>Volte ao <a href="./">jogo</a> e faça sua primeira rota. Se quiser aprender a enxergar sílabas com mais facilidade, leia o artigo <a href="dicas/como-pensar-em-silabas.html">Como pensar em sílabas</a> ou veja todas as <a href="dicas.html">dicas</a>.</p>
+
+    <footer class="rodape-site">
+      <a href="como-jogar.html">Como jogar</a> · <a href="dicas.html">Dicas</a> · <a href="sobre.html">Sobre</a> · <a href="contato.html">Contato</a> · <a href="privacidade.html">Privacidade</a> · <a href="termos.html">Termos</a>
+      <br>Rota do Dia, um jogo da <a href="https://divisionstech.com">Divisions Tech</a>.
+    </footer>
+  </main>
+</body>
+</html>
