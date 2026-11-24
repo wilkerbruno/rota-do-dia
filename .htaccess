@@ -1,0 +1,29 @@
+# Rota do Dia - Apache (cPanel e container do Easypanel)
+Options -Indexes
+AddType application/manifest+json .webmanifest
+
+<IfModule mod_headers.c>
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+  <FilesMatch "\.(html|js|css|txt|webmanifest)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # URLs de spam da invasao antiga (21/11/2026): 410 Gone para o Google tirar do indice.
+  # So vale para .php na raiz; a API fica em /api/.
+  RewriteRule ^[^/]+\.php$ - [G,L]
+  RewriteRule ^shop/ - [G,L]
+  # HTTPS: atras do Cloudflare/Easypanel o TLS termina no proxy, que manda X-Forwarded-Proto.
+  RewriteCond %{HTTPS} off
+  RewriteCond %{HTTP:X-Forwarded-Proto} !https
+  RewriteCond %{REQUEST_URI} !^/\.well-known/
+  RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+
+# Arquivos do projeto que nao devem ser servidos
+<FilesMatch "^(README\.md|Dockerfile|package\.json|\.htaccess.*)$">
+  Require all denied
+</FilesMatch>

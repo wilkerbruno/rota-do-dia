@@ -1,0 +1,11 @@
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md
+docs
+tests
+ferramentas
+package.json
+node_modules
+*.zip

@@ -1,0 +1,9 @@
+*.zip
+*.sqlite
+*.sqlite-*
+rota-dados/
+config/
+*.env
+.env*
+__pycache__/
+node_modules/
